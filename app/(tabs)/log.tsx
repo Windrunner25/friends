@@ -2,12 +2,12 @@ import { StyleSheet, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/theme';
 
-export default function HomeScreen() {
+export default function LogScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Home</Text>
-        <Text style={styles.subtitle}>Your people, up next.</Text>
+        <Text style={styles.title}>Log</Text>
+        <Text style={styles.subtitle}>Record an interaction.</Text>
       </View>
     </SafeAreaView>
   );
