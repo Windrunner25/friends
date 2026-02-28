@@ -1,7 +1,7 @@
 export type CadenceTier = 'close_friend' | 'keep_warm' | 'dont_lose_touch';
 export type NetworkTier = 'active' | 'keep_warm' | 'dont_lose_touch';
 export type PersonType = 'friend' | 'network';
-export type InteractionType = 'call' | 'facetime' | 'text' | 'in_person';
+export type InteractionType = 'call' | 'facetime' | 'text' | 'email' | 'in_person';
 
 export interface Person {
   id: string;
@@ -11,7 +11,7 @@ export interface Person {
   cadence_tier: CadenceTier | NetworkTier;
   where_from?: string;
   birthday?: string; // ISO date string 'YYYY-MM-DD'
-  preferred_interaction_type: InteractionType;
+  nudge_interaction_type: InteractionType;
   date_added: string; // ISO date string
   last_interaction_date?: string; // ISO date string, derived from interactions
   last_interaction_note?: string; // snippet from most recent interaction notes

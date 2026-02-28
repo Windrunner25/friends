@@ -6,13 +6,13 @@
 import { Platform } from 'react-native';
 
 export const Palette = {
-  background: '#F5F0E8',    // warm parchment
+  background: '#DDD0BC',    // warm tan parchment
   text: '#2C2825',          // deep warm charcoal
-  accent: '#6B8CAE',        // dusty steel blue — buttons, highlights, active states
-  midTier: '#9AB3C8',       // Keep Warm tier indicator
-  lightTier: '#C8D8E4',     // Don't Lose Touch tier indicator
-  cardSurface: '#EDE8DF',   // slightly darker warm off-white for cards
-  tabBarBorder: '#DDD8CE',  // subtle warm border
+  accent: '#4A7A9B',        // deep steel blue — buttons, highlights, active states
+  midTier: '#6B8CAE',       // Keep Warm tier indicator
+  lightTier: '#8FA8C0',     // Don't Lose Touch tier indicator
+  cardSurface: '#CFC4AE',   // slightly darker card surface
+  tabBarBorder: '#C1B4A0',  // subtle warm border
   iconInactive: '#A8A39A',  // muted warm grey for inactive tab icons
 };
 
