@@ -17,7 +17,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
 import { MOCK_PEOPLE, MOCK_MOMENTS, MockMoment } from '@/data/mock';
 import { ContactCard } from '@/components/ContactCard';
-import type { Person } from '@/types';
+import { LogModal } from '@/components/LogModal';
+import type { Person, InteractionType } from '@/types';
 import {
   tierColor,
   tierLabel,
@@ -29,7 +30,7 @@ import {
   upcomingBirthdays,
 } from '@/utils/people';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const TODAY = new Date();
 
@@ -37,6 +38,12 @@ function formatHeaderDate(): string {
   const weekday = TODAY.toLocaleDateString('en-US', { weekday: 'long' });
   const month = TODAY.toLocaleDateString('en-US', { month: 'long' });
   return `${weekday}, ${month} ${TODAY.getDate()}`;
+}
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -50,6 +57,73 @@ function TierBubble({ tier }: { tier: Person['cadence_tier'] }) {
   );
 }
 
+function InitialAvatar({ person, size = 44 }: { person: Person; size?: number }) {
+  const color = tierColor(person.cadence_tier);
+  const initials = `${person.first_name[0]}${person.last_name[0]}`;
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color + '30' }]}>
+      <Text style={[styles.avatarInitials, { color }]}>{initials}</Text>
+    </View>
+  );
+}
+
+// ─── Up Next Card (2×2 grid) ─────────────────────────────────────────────────
+
+function UpNextCard({
+  person,
+  completed,
+  onPress,
+  onMarkComplete,
+}: {
+  person: Person;
+  completed: boolean;
+  onPress: () => void;
+  onMarkComplete: () => void;
+}) {
+  const color = tierColor(person.cadence_tier);
+
+  return (
+    <TouchableOpacity
+      style={[styles.upNextCard, { borderTopColor: color, opacity: completed ? 0.55 : 1 }]}
+      onPress={onPress}
+      activeOpacity={0.75}>
+
+      {/* Name */}
+      <Text style={styles.upNextName} numberOfLines={1}>
+        {person.first_name} {person.last_name}
+      </Text>
+
+      {/* Tier bubble */}
+      <TierBubble tier={person.cadence_tier} />
+
+      {/* Nudge icon + relative time */}
+      <View style={styles.upNextMeta}>
+        <IconSymbol name={nudgeIconName(person.nudge_interaction_type)} size={11} color={Palette.iconInactive} />
+        <Text style={styles.upNextTime} numberOfLines={1}>
+          {relativeTime(person.last_interaction_date)}
+        </Text>
+      </View>
+
+      {/* Mark as Complete button / completed state */}
+      {completed ? (
+        <View style={styles.completedRow}>
+          <IconSymbol name="checkmark.circle.fill" size={15} color="#5CB85C" />
+          <Text style={styles.completedText}>Done</Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.completeBtn}
+          onPress={onMarkComplete}
+          activeOpacity={0.75}>
+          <Text style={styles.completeBtnText}>Mark Complete</Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Person Row (More! roster) ───────────────────────────────────────────────
+
 function PersonRow({ person, onPress }: { person: Person; onPress: () => void }) {
   const accentColor = tierColor(person.cadence_tier);
   return (
@@ -62,26 +136,14 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
         <TierBubble tier={person.cadence_tier} />
       </View>
       <View style={styles.personRowRight}>
-        <IconSymbol
-          name={nudgeIconName(person.nudge_interaction_type)}
-          size={13}
-          color={Palette.iconInactive}
-        />
+        <IconSymbol name={nudgeIconName(person.nudge_interaction_type)} size={13} color={Palette.iconInactive} />
         <Text style={styles.personTime}>{relativeTime(person.last_interaction_date)}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-function InitialAvatar({ person, size = 44 }: { person: Person; size?: number }) {
-  const color = tierColor(person.cadence_tier);
-  const initials = `${person.first_name[0]}${person.last_name[0]}`;
-  return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color + '30' }]}>
-      <Text style={[styles.avatarInitials, { color }]}>{initials}</Text>
-    </View>
-  );
-}
+// ─── Birthday Tile ───────────────────────────────────────────────────────────
 
 function BirthdayTile({ person, onPress }: { person: Person; onPress: () => void }) {
   const color = tierColor(person.cadence_tier);
@@ -97,6 +159,8 @@ function BirthdayTile({ person, onPress }: { person: Person; onPress: () => void
   );
 }
 
+// ─── Moments Tile ────────────────────────────────────────────────────────────
+
 function MomentsTile({ moment, onPress }: { moment: MockMoment; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.momentsTile} onPress={onPress} activeOpacity={0.7}>
@@ -109,6 +173,8 @@ function MomentsTile({ moment, onPress }: { moment: MockMoment; onPress: () => v
     </TouchableOpacity>
   );
 }
+
+// ─── Moments Modal ───────────────────────────────────────────────────────────
 
 function MomentsModal({
   visible,
@@ -154,23 +220,29 @@ function MomentsModal({
   );
 }
 
-// ─── Page Content ─────────────────────────────────────────────────────────────
+// ─── Friends Page ─────────────────────────────────────────────────────────────
 
 function FriendsPage({
   pageWidth,
   pageHeight,
+  completedIds,
   onPersonPress,
+  onMarkComplete,
 }: {
   pageWidth: number;
   pageHeight: number;
+  completedIds: Set<string>;
   onPersonPress: (p: Person) => void;
+  onMarkComplete: (p: Person) => void;
 }) {
   const people = MOCK_PEOPLE.filter((p) => p.type === 'friend');
   const sorted = [...people].sort((a, b) => (b.days_overdue ?? -999) - (a.days_overdue ?? -999));
-  const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 3);
+  // Up Next: up to 4 people due (days_overdue >= 0), most overdue first
+  const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 4);
   const upNextIds = new Set(upNext.map((p) => p.id));
   const moreRoster = sorted.filter((p) => !upNextIds.has(p.id));
   const birthdays = upcomingBirthdays(people);
+  const upNextRows = chunkArray(upNext, 2);
 
   return (
     <ScrollView
@@ -181,9 +253,21 @@ function FriendsPage({
       {upNext.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Up Next</Text>
-          <View style={styles.rosterList}>
-            {upNext.map((p) => (
-              <PersonRow key={p.id} person={p} onPress={() => onPersonPress(p)} />
+          <View style={styles.upNextGrid}>
+            {upNextRows.map((row, rowIdx) => (
+              <View key={rowIdx} style={styles.upNextRow}>
+                {row.map((p) => (
+                  <UpNextCard
+                    key={p.id}
+                    person={p}
+                    completed={completedIds.has(p.id)}
+                    onPress={() => onPersonPress(p)}
+                    onMarkComplete={() => onMarkComplete(p)}
+                  />
+                ))}
+                {/* Spacer keeps single card at half-width when row has only 1 item */}
+                {row.length === 1 && <View style={styles.upNextCardSpacer} />}
+              </View>
             ))}
           </View>
         </View>
@@ -205,7 +289,7 @@ function FriendsPage({
 
       {moreRoster.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>More!</Text>
+          <Text style={styles.sectionLabel}>More Friends!</Text>
           <View style={styles.rosterList}>
             {moreRoster.map((p) => (
               <PersonRow key={p.id} person={p} onPress={() => onPersonPress(p)} />
@@ -218,25 +302,31 @@ function FriendsPage({
   );
 }
 
+// ─── Network Page ─────────────────────────────────────────────────────────────
+
 function NetworkPage({
   pageWidth,
   pageHeight,
+  completedIds,
   onPersonPress,
+  onMarkComplete,
 }: {
   pageWidth: number;
   pageHeight: number;
+  completedIds: Set<string>;
   onPersonPress: (p: Person) => void;
+  onMarkComplete: (p: Person) => void;
 }) {
   const [selectedMoment, setSelectedMoment] = useState<MockMoment | null>(null);
 
   const people = MOCK_PEOPLE.filter((p) => p.type === 'network');
   const sorted = [...people].sort((a, b) => (b.days_overdue ?? -999) - (a.days_overdue ?? -999));
-  const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 3);
+  const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 4);
   const upNextIds = new Set(upNext.map((p) => p.id));
   const moreRoster = sorted.filter((p) => !upNextIds.has(p.id));
   const birthdays = upcomingBirthdays(people);
   const networkDue = sorted.filter((p) => (p.days_overdue ?? -1) >= 0);
-
+  const upNextRows = chunkArray(upNext, 2);
   const hasUpcoming = birthdays.length > 0 || MOCK_MOMENTS.length > 0;
 
   return (
@@ -249,9 +339,20 @@ function NetworkPage({
         {upNext.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Up Next</Text>
-            <View style={styles.rosterList}>
-              {upNext.map((p) => (
-                <PersonRow key={p.id} person={p} onPress={() => onPersonPress(p)} />
+            <View style={styles.upNextGrid}>
+              {upNextRows.map((row, rowIdx) => (
+                <View key={rowIdx} style={styles.upNextRow}>
+                  {row.map((p) => (
+                    <UpNextCard
+                      key={p.id}
+                      person={p}
+                      completed={completedIds.has(p.id)}
+                      onPress={() => onPersonPress(p)}
+                      onMarkComplete={() => onMarkComplete(p)}
+                    />
+                  ))}
+                  {row.length === 1 && <View style={styles.upNextCardSpacer} />}
+                </View>
               ))}
             </View>
           </View>
@@ -293,7 +394,7 @@ function NetworkPage({
 
         {moreRoster.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>More!</Text>
+            <Text style={styles.sectionLabel}>More Buddies!</Text>
             <View style={styles.rosterList}>
               {moreRoster.map((p) => (
                 <PersonRow key={p.id} person={p} onPress={() => onPersonPress(p)} />
@@ -315,13 +416,16 @@ function NetworkPage({
   );
 }
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<'friends' | 'network'>('friends');
   const [pagerHeight, setPagerHeight] = useState(SCREEN_HEIGHT);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [logModalPerson, setLogModalPerson] = useState<Person | null>(null);
+  const [logModalVisible, setLogModalVisible] = useState(false);
   const pagerRef = useRef<ScrollView>(null);
 
   function handleTabPress(tab: 'friends' | 'network') {
@@ -332,6 +436,15 @@ export default function HomeScreen() {
   function handlePageChange(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const page = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setActiveTab(page === 0 ? 'friends' : 'network');
+  }
+
+  function handleMarkComplete(person: Person) {
+    setLogModalPerson(person);
+    setLogModalVisible(true);
+  }
+
+  function handleLogSave(person: Person, _type: InteractionType, _notes: string, _date: string) {
+    setCompletedIds((prev) => new Set([...prev, person.id]));
   }
 
   return (
@@ -350,7 +463,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Tab switcher — centered, underline style */}
+      {/* Friends / Network tab switcher */}
       <View style={styles.tabSwitcher}>
         {(['friends', 'network'] as const).map((tab) => (
           <TouchableOpacity
@@ -367,9 +480,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Pager */}
-      <View
-        style={{ flex: 1 }}
-        onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}>
+      <View style={{ flex: 1 }} onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}>
         <ScrollView
           ref={pagerRef}
           horizontal
@@ -381,12 +492,16 @@ export default function HomeScreen() {
           <FriendsPage
             pageWidth={SCREEN_WIDTH}
             pageHeight={pagerHeight}
+            completedIds={completedIds}
             onPersonPress={setSelectedPerson}
+            onMarkComplete={handleMarkComplete}
           />
           <NetworkPage
             pageWidth={SCREEN_WIDTH}
             pageHeight={pagerHeight}
+            completedIds={completedIds}
             onPersonPress={setSelectedPerson}
+            onMarkComplete={handleMarkComplete}
           />
         </ScrollView>
       </View>
@@ -396,6 +511,14 @@ export default function HomeScreen() {
         person={selectedPerson}
         visible={selectedPerson !== null}
         onClose={() => setSelectedPerson(null)}
+      />
+
+      {/* Log Modal — triggered from Mark as Complete on Up Next cards */}
+      <LogModal
+        visible={logModalVisible}
+        initialPerson={logModalPerson}
+        onClose={() => { setLogModalVisible(false); setLogModalPerson(null); }}
+        onSave={handleLogSave}
       />
 
     </SafeAreaView>
@@ -442,7 +565,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.tabBarBorder,
   },
 
-  // Tab switcher
+  // Friends/Network tab switcher
   tabSwitcher: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -494,10 +617,88 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  // Roster list
-  rosterList: {
-    gap: 8,
+  // Up Next 2×2 grid
+  upNextGrid: {
+    gap: 10,
   },
+  upNextRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  upNextCard: {
+    flex: 1,
+    backgroundColor: Palette.cardSurface,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
+    borderTopWidth: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.07,
+        shadowRadius: 4,
+      },
+    }),
+  },
+  upNextCardSpacer: {
+    flex: 1,
+  },
+  upNextName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Palette.text,
+    letterSpacing: -0.2,
+  },
+  upNextMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  upNextTime: {
+    fontSize: 11,
+    color: Palette.iconInactive,
+    flexShrink: 1,
+  },
+  completeBtn: {
+    backgroundColor: Palette.accent + '18',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  completeBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Palette.accent,
+  },
+  completedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  completedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#5CB85C',
+  },
+
+  // Tier bubble
+  tierBubble: {
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  tierBubbleText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Roster rows (More!)
+  rosterList: { gap: 8 },
   personRow: {
     backgroundColor: Palette.cardSurface,
     borderRadius: 12,
@@ -541,30 +742,14 @@ const styles = StyleSheet.create({
     color: Palette.iconInactive,
   },
 
-  // Tier bubble
-  tierBubble: {
-    borderRadius: 20,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    flexShrink: 0,
-  },
-  tierBubbleText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-
   // Upcoming rows
-  upcomingRow: {
-    gap: 8,
-  },
+  upcomingRow: { gap: 8 },
   upcomingRowLabel: {
     fontSize: 12,
     fontWeight: '500',
     color: Palette.iconInactive,
     letterSpacing: 0.3,
   },
-
-  // Horizontal scroll
   horizontalScroll: {
     gap: 10,
     paddingRight: 4,
@@ -649,7 +834,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Initial avatar (birthday tiles)
+  // Avatar
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -724,7 +909,5 @@ const styles = StyleSheet.create({
     color: Palette.iconInactive,
     marginTop: 4,
   },
-  modalRoster: {
-    gap: 8,
-  },
+  modalRoster: { gap: 8 },
 });

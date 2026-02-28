@@ -444,6 +444,18 @@ export const MOCK_INTERACTIONS: Interaction[] = [
   // David Kim (n2)
   { id: 'i13', person_id: 'n2', date_of_interaction: '2026-01-20', date_logged: '2026-01-20', type: 'text', notes: "He's advising two new startups now. Said he'd make an intro to one of the founders." },
   { id: 'i14', person_id: 'n2', date_of_interaction: '2025-09-08', date_logged: '2025-09-08', type: 'call', notes: 'Great conversation about leadership and product strategy. He has a lot of wisdom.' },
+  // Additional interactions — spreads streak and fills in monthly chart
+  { id: 'i15', person_id: 'f4',  date_of_interaction: '2026-02-25', date_logged: '2026-02-25', type: 'in_person' },
+  { id: 'i16', person_id: 'f9',  date_of_interaction: '2026-02-17', date_logged: '2026-02-17', type: 'text',      notes: 'Checked in on her book club — she just finished a new novel.' },
+  { id: 'i17', person_id: 'n8',  date_of_interaction: '2026-02-10', date_logged: '2026-02-10', type: 'text' },
+  { id: 'i18', person_id: 'f6',  date_of_interaction: '2026-01-29', date_logged: '2026-01-29', type: 'call' },
+  { id: 'i19', person_id: 'n11', date_of_interaction: '2026-01-12', date_logged: '2026-01-12', type: 'call',      notes: 'Catching up after the episode aired. Great listener.' },
+  { id: 'i20', person_id: 'f7',  date_of_interaction: '2025-12-22', date_logged: '2025-12-22', type: 'call',      notes: 'Holiday check-in. She sounded really relaxed.' },
+  { id: 'i21', person_id: 'n6',  date_of_interaction: '2025-11-05', date_logged: '2025-11-05', type: 'email',     notes: 'Following up on his content strategy ideas.' },
+  { id: 'i22', person_id: 'f12', date_of_interaction: '2025-10-28', date_logged: '2025-10-28', type: 'text' },
+  { id: 'i23', person_id: 'f15', date_of_interaction: '2025-08-30', date_logged: '2025-08-30', type: 'facetime',   notes: 'Catching up on her summer. She went hiking in Iceland.' },
+  { id: 'i24', person_id: 'n5',  date_of_interaction: '2025-06-18', date_logged: '2025-06-18', type: 'text' },
+  { id: 'i25', person_id: 'f10', date_of_interaction: '2025-04-10', date_logged: '2025-04-10', type: 'call' },
 ];
 
 export const MOCK_MOMENTS: MockMoment[] = [
