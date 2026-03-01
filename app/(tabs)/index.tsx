@@ -8,16 +8,19 @@ import {
   Platform,
   Modal,
   Pressable,
+  ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { MOCK_PEOPLE, MOCK_MOMENTS, MockMoment } from '@/data/mock';
+import { MOCK_MOMENTS, MockMoment } from '@/data/mock';
 import { ContactCard } from '@/components/ContactCard';
 import { LogModal } from '@/components/LogModal';
+import { usePeople } from '@/hooks/use-people';
 import type { Person, InteractionType } from '@/types';
 import {
   tierColor,
@@ -223,19 +226,21 @@ function MomentsModal({
 // ─── Friends Page ─────────────────────────────────────────────────────────────
 
 function FriendsPage({
+  people,
   pageWidth,
   pageHeight,
   completedIds,
   onPersonPress,
   onMarkComplete,
 }: {
+  people: Person[];
   pageWidth: number;
   pageHeight: number;
   completedIds: Set<string>;
   onPersonPress: (p: Person) => void;
   onMarkComplete: (p: Person) => void;
 }) {
-  const people = MOCK_PEOPLE.filter((p) => p.type === 'friend');
+  console.log('[FriendsPage] received people prop, count:', people.length);
   const sorted = [...people].sort((a, b) => (b.days_overdue ?? -999) - (a.days_overdue ?? -999));
   // Up Next: up to 4 people due (days_overdue >= 0), most overdue first
   const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 4);
@@ -305,12 +310,14 @@ function FriendsPage({
 // ─── Network Page ─────────────────────────────────────────────────────────────
 
 function NetworkPage({
+  people,
   pageWidth,
   pageHeight,
   completedIds,
   onPersonPress,
   onMarkComplete,
 }: {
+  people: Person[];
   pageWidth: number;
   pageHeight: number;
   completedIds: Set<string>;
@@ -319,7 +326,7 @@ function NetworkPage({
 }) {
   const [selectedMoment, setSelectedMoment] = useState<MockMoment | null>(null);
 
-  const people = MOCK_PEOPLE.filter((p) => p.type === 'network');
+  console.log('[NetworkPage] received people prop, count:', people.length);
   const sorted = [...people].sort((a, b) => (b.days_overdue ?? -999) - (a.days_overdue ?? -999));
   const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 4);
   const upNextIds = new Set(upNext.map((p) => p.id));
@@ -419,7 +426,13 @@ function NetworkPage({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { people, loading } = usePeople();
+  const friends = people.filter((p) => p.type === 'friend');
+  const network = people.filter((p) => p.type === 'network');
+  console.log('[HomeScreen] loading:', loading, '| total people:', people.length, '| friends:', friends.length, '| network:', network.length);
+  if (people.length > 0) console.log('[HomeScreen] first person:', JSON.stringify(people[0], null, 2));
   const [activeTab, setActiveTab] = useState<'friends' | 'network'>('friends');
   const [pagerHeight, setPagerHeight] = useState(SCREEN_HEIGHT);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -457,7 +470,7 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.headerDate}>{formatHeaderDate()}</Text>
         <View style={[styles.headerSide, styles.headerSideRight]}>
-          <TouchableOpacity hitSlop={12}>
+          <TouchableOpacity hitSlop={12} onPress={() => router.push('/settings')}>
             <IconSymbol name="gearshape.fill" size={20} color={Palette.iconInactive} />
           </TouchableOpacity>
         </View>
@@ -481,29 +494,37 @@ export default function HomeScreen() {
 
       {/* Pager */}
       <View style={{ flex: 1 }} onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}>
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handlePageChange}
-          scrollEventThrottle={16}
-          style={{ flex: 1 }}>
-          <FriendsPage
-            pageWidth={SCREEN_WIDTH}
-            pageHeight={pagerHeight}
-            completedIds={completedIds}
-            onPersonPress={setSelectedPerson}
-            onMarkComplete={handleMarkComplete}
-          />
-          <NetworkPage
-            pageWidth={SCREEN_WIDTH}
-            pageHeight={pagerHeight}
-            completedIds={completedIds}
-            onPersonPress={setSelectedPerson}
-            onMarkComplete={handleMarkComplete}
-          />
-        </ScrollView>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Palette.accent} />
+          </View>
+        ) : (
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handlePageChange}
+            scrollEventThrottle={16}
+            style={{ flex: 1 }}>
+            <FriendsPage
+              people={friends}
+              pageWidth={SCREEN_WIDTH}
+              pageHeight={pagerHeight}
+              completedIds={completedIds}
+              onPersonPress={setSelectedPerson}
+              onMarkComplete={handleMarkComplete}
+            />
+            <NetworkPage
+              people={network}
+              pageWidth={SCREEN_WIDTH}
+              pageHeight={pagerHeight}
+              completedIds={completedIds}
+              onPersonPress={setSelectedPerson}
+              onMarkComplete={handleMarkComplete}
+            />
+          </ScrollView>
+        )}
       </View>
 
       {/* Contact Card */}
@@ -598,6 +619,13 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     backgroundColor: Palette.accent,
+  },
+
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Page content

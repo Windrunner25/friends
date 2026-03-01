@@ -113,3 +113,33 @@ export function formatShortDate(dateStr: string): string {
     year: 'numeric',
   });
 }
+
+// ─── Cadence ──────────────────────────────────────────────────────────────────
+
+// How many days between expected interactions per tier.
+// close_friend / active → bi-weekly; keep_warm → monthly; dont_lose_touch → quarterly.
+export const CADENCE_DAYS: Record<string, number> = {
+  close_friend: 14,
+  active: 14,
+  keep_warm: 30,
+  dont_lose_touch: 90,
+};
+
+/**
+ * Compute how many days overdue a person is.
+ * Positive = overdue, negative = days until due, 0 = due today.
+ * If they've never been contacted, treat as overdue by the full cadence period.
+ */
+export function computeDaysOverdue(
+  lastInteractionDate: string | null | undefined,
+  tier: string,
+): number {
+  const cadenceDays = CADENCE_DAYS[tier] ?? 30;
+  if (!lastInteractionDate) return cadenceDays;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const last = new Date(lastInteractionDate + 'T00:00:00');
+  last.setHours(0, 0, 0, 0);
+  const daysSince = Math.floor((today.getTime() - last.getTime()) / 86400000);
+  return daysSince - cadenceDays;
+}

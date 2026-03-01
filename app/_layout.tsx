@@ -5,6 +5,9 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+// Auth files (contexts/auth.tsx, app/(auth)/) are kept in place for when
+// auth gating is re-enabled. See lib/supabase.js for the dev user ID.
+
 export const unstable_settings = {
   anchor: '(tabs)',
 };
@@ -16,6 +19,16 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            headerBackTitle: '',
+            headerStyle: { backgroundColor: '#DDD0BC' },
+            headerTintColor: '#2C2825',
+            headerShadowVisible: false,
+          }}
+        />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
