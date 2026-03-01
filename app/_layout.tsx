@@ -24,8 +24,8 @@ export default function RootLayout() {
           options={{
             title: 'Settings',
             headerBackTitle: '',
-            headerStyle: { backgroundColor: '#DDD0BC' },
-            headerTintColor: '#2C2825',
+            headerStyle: { backgroundColor: '#E8DFD0' },
+            headerTintColor: '#1A1410',
             headerShadowVisible: false,
           }}
         />

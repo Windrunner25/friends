@@ -428,7 +428,7 @@ function NetworkPage({
 export default function HomeScreen() {
   const router = useRouter();
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
-  const { people, loading } = usePeople();
+  const { people, loading, updatePerson } = usePeople();
   const friends = people.filter((p) => p.type === 'friend');
   const network = people.filter((p) => p.type === 'network');
   console.log('[HomeScreen] loading:', loading, '| total people:', people.length, '| friends:', friends.length, '| network:', network.length);
@@ -532,6 +532,10 @@ export default function HomeScreen() {
         person={selectedPerson}
         visible={selectedPerson !== null}
         onClose={() => setSelectedPerson(null)}
+        onPersonChanged={(id, changes) => {
+          updatePerson(id, changes);
+          setSelectedPerson((prev) => (prev?.id === id ? { ...prev, ...changes } : prev));
+        }}
       />
 
       {/* Log Modal — triggered from Mark as Complete on Up Next cards */}

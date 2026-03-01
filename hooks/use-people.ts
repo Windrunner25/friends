@@ -8,6 +8,7 @@ interface UsePeopleResult {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  updatePerson: (id: string, changes: Partial<Person>) => void;
 }
 
 export function usePeople(): UsePeopleResult {
@@ -61,9 +62,13 @@ export function usePeople(): UsePeopleResult {
     setLoading(false);
   }, []);
 
+  const updatePerson = useCallback((id: string, changes: Partial<Person>) => {
+    setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...changes } : p)));
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
 
-  return { people, loading, error, refetch: load };
+  return { people, loading, error, refetch: load, updatePerson };
 }

@@ -51,39 +51,41 @@ A personal, privacy-first relationship manager for staying connected with friend
 # Design System
 
 ## Color Palette
-- **Background:** #DDD0BC (warm tan)
-- **Primary Text:** #2C2825 (deep warm charcoal)
-- **Accent:** #4A7A9B (deep steel blue — buttons, highlights, active states)
-- **Mid Tier:** #6B8CAE (Keep Warm tier indicator)
-- **Light Tier:** #8FA8C0 (Don't Lose Touch tier indicator)
-- **Card Surface:** #CFC4AE (slightly darker warm tan for cards and elevated surfaces)
+- **Background:** #E8DFD0 (warm tan)
+- **Primary Text:** #1A1410 (deep warm charcoal)
+- **Secondary Text:** #6B5F52 (secondary text / inactive icons)
+- **Accent:** #2D5F8A (deep steel blue — buttons, highlights, active states)
+- **Mid Tier:** #4A7A9B (Keep Warm tier indicator)
+- **Light Tier:** #7A9DB5 (Don't Lose Touch tier indicator)
+- **Card Surface:** #F0EAE0 (card surface)
+- **Dividers / Borders:** #C8BFB0 (subtle warm border)
 - **Completed State:** soft gray overlay with soft green circled checkmark
 
 ## Tier Color System
-- Close Friend / Active → #4A7A9B (deep steel blue)
-- Keep Warm → #6B8CAE (mid blue)
-- Don't Lose Touch → #8FA8C0 (light blue)
+- Close Friend / Active → #2D5F8A (deep steel blue)
+- Keep Warm → #4A7A9B (mid blue)
+- Don't Lose Touch → #7A9DB5 (light blue)
 
 ## Tier Icons
 Each tier has a dedicated icon displayed inside a colored bubble matching the tier color.
 
 **Friends**
-- Close Friend → Polaroid icon (bubble: #4A7A9B)
-- Keep Warm → Hammock icon (bubble: #6B8CAE)
-- Don't Lose Touch → Feather icon (bubble: #8FA8C0)
+- Close Friend → Polaroid icon (bubble: #2D5F8A)
+- Keep Warm → Hammock icon (bubble: #4A7A9B)
+- Don't Lose Touch → Feather icon (bubble: #7A9DB5)
 
 **Network**
-- Active → Lightning bolt icon (bubble: #4A7A9B)
-- Keep Warm → Anchor icon (bubble: #6B8CAE)
-- Don't Lose Touch → Satellite icon (bubble: #8FA8C0)
+- Active → Lightning bolt icon (bubble: #2D5F8A)
+- Keep Warm → Anchor icon (bubble: #4A7A9B)
+- Don't Lose Touch → Satellite icon (bubble: #7A9DB5)
 
 Tier icons appear consistently throughout the app wherever a tier is referenced — Up Next cards, birthday tiles, person detail cards, onboarding swipe screens, leaderboard rows.
 
 ## Tier Bubbles (text)
 Tier name spelled out in a small rounded pill/bubble, color coded to tier:
-- "Close Friend" / "Active" → #4A7A9B bubble
-- "Keep Warm" → #6B8CAE bubble
-- "Don't Lose Touch" → #8FA8C0 bubble
+- "Close Friend" / "Active" → #2D5F8A bubble
+- "Keep Warm" → #4A7A9B bubble
+- "Don't Lose Touch" → #7A9DB5 bubble
 
 ## Design Principles
 - Minimalistic, warm, fluid
@@ -260,7 +262,7 @@ Settings lives as a gear icon in the top right corner of the Home screen — not
 ### Friends / Network Sub-tabs
 - Sits just below the top bar
 - Two tab labels: "Friends" and "Network"
-- Active tab has a small dusty steel blue (#4A7A9B) underline indicator
+- Active tab has a small dusty steel blue (#2D5F8A) underline indicator
 - Paged swipe navigation — swiping left/right slides the entire view as one wide canvas (react-native-pager-view)
 - All sections below respond to the active tab
 

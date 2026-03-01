@@ -9,6 +9,7 @@ import {
   Platform,
   ActionSheetIOS,
   Alert,
+  ActivityIndicator,
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -16,8 +17,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { MOCK_PEOPLE } from '@/data/mock';
 import { ContactCard } from '@/components/ContactCard';
+import { usePeople } from '@/hooks/use-people';
 import type { Person } from '@/types';
 import { tierColor, tierLabel, tierIconName, relativeTime } from '@/utils/people';
 
@@ -67,11 +68,13 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
 
 function PeoplePage({
   type,
+  people,
   pageWidth,
   pageHeight,
   onPersonPress,
 }: {
   type: 'friend' | 'network';
+  people: Person[];
   pageWidth: number;
   pageHeight: number;
   onPersonPress: (p: Person) => void;
@@ -80,7 +83,7 @@ function PeoplePage({
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
 
   const tiers = type === 'friend' ? FRIEND_TIERS : NETWORK_TIERS;
-  const allPeople = MOCK_PEOPLE.filter((p) => p.type === type);
+  const allPeople = people;
 
   // Tier filter: empty set = show all
   const tierFiltered =
@@ -184,6 +187,9 @@ function PeoplePage({
 
 export default function PeopleScreen() {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { people, loading, updatePerson } = usePeople();
+  const friends = people.filter((p) => p.type === 'friend');
+  const network = people.filter((p) => p.type === 'network');
   const [activeTab, setActiveTab] = useState<'friends' | 'network'>('friends');
   const [pagerHeight, setPagerHeight] = useState(SCREEN_HEIGHT);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -241,28 +247,36 @@ export default function PeopleScreen() {
 
       {/* Pager */}
       <View style={{ flex: 1 }} onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}>
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handlePageChange}
-          scrollEventThrottle={16}
-          style={{ flex: 1 }}
-          keyboardShouldPersistTaps="handled">
-          <PeoplePage
-            type="friend"
-            pageWidth={SCREEN_WIDTH}
-            pageHeight={pagerHeight}
-            onPersonPress={setSelectedPerson}
-          />
-          <PeoplePage
-            type="network"
-            pageWidth={SCREEN_WIDTH}
-            pageHeight={pagerHeight}
-            onPersonPress={setSelectedPerson}
-          />
-        </ScrollView>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Palette.accent} />
+          </View>
+        ) : (
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handlePageChange}
+            scrollEventThrottle={16}
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled">
+            <PeoplePage
+              type="friend"
+              people={friends}
+              pageWidth={SCREEN_WIDTH}
+              pageHeight={pagerHeight}
+              onPersonPress={setSelectedPerson}
+            />
+            <PeoplePage
+              type="network"
+              people={network}
+              pageWidth={SCREEN_WIDTH}
+              pageHeight={pagerHeight}
+              onPersonPress={setSelectedPerson}
+            />
+          </ScrollView>
+        )}
       </View>
 
       {/* Floating + button */}
@@ -275,6 +289,10 @@ export default function PeopleScreen() {
         person={selectedPerson}
         visible={selectedPerson !== null}
         onClose={() => setSelectedPerson(null)}
+        onPersonChanged={(id, changes) => {
+          updatePerson(id, changes);
+          setSelectedPerson((prev) => (prev?.id === id ? { ...prev, ...changes } : prev));
+        }}
       />
 
     </SafeAreaView>
@@ -444,6 +462,13 @@ const styles = StyleSheet.create({
   tierBubbleText: {
     fontSize: 11,
     fontWeight: '500',
+  },
+
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Empty state

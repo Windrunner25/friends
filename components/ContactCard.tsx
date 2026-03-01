@@ -11,12 +11,14 @@ import {
   Linking,
   Alert,
   ActionSheetIOS,
+  ActivityIndicator,
   Platform,
   useWindowDimensions,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { MOCK_INTERACTIONS } from '@/data/mock';
+import { supabase } from '@/lib/supabase';
+import { useInteractions } from '@/hooks/use-interactions';
 import type { Person, Interaction, InteractionType } from '@/types';
 import {
   tierColor,
@@ -142,7 +144,7 @@ function HistoryEntry({ interaction, isLast }: { interaction: Interaction; isLas
 
 // ─── Inner content (non-null person) ─────────────────────────────────────────
 
-function ContactCardContent({ person, onClose }: { person: Person; onClose: () => void }) {
+function ContactCardContent({ person, onClose, onPersonChanged }: { person: Person; onClose: () => void; onPersonChanged?: (id: string, changes: Partial<Person>) => void }) {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const SHEET_HEIGHT = SCREEN_HEIGHT - 88;
 
@@ -152,6 +154,8 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
   const [editedWhereFrom, setEditedWhereFrom] = useState<string | undefined>(person.where_from);
   const [editedBirthday, setEditedBirthday] = useState<string | undefined>(person.birthday);
   const [editedNudge, setEditedNudge] = useState<InteractionType>(person.nudge_interaction_type);
+
+  const { interactions, loading: interactionsLoading } = useInteractions(person.id);
 
   const dragY = useRef(new Animated.Value(0)).current;
   // Tracks ScrollView position so we only intercept downward drags at the top
@@ -187,10 +191,6 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
     })
   ).current;
 
-  const interactions = MOCK_INTERACTIONS
-    .filter((i) => i.person_id === person.id)
-    .sort((a, b) => new Date(b.date_of_interaction).getTime() - new Date(a.date_of_interaction).getTime());
-
   const tierColorVal = tierColor(editedTier);
 
   function openMessages() { Linking.openURL('sms:'); }
@@ -202,8 +202,24 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
     ActionSheetIOS.showActionSheetWithOptions(
       { options: ['Cancel', 'Friend', 'Network'], cancelButtonIndex: 0 },
       (idx) => {
-        if (idx === 1) setEditedType('friend');
-        if (idx === 2) setEditedType('network');
+        if (idx === 1) {
+          setEditedType('friend');
+          console.log('[ContactCard] UPDATE type → friend | person.id:', person.id);
+          supabase.from('people').update({ type: 'friend' }).eq('id', person.id)
+            .then(({ data, error, status }) => {
+              console.log('[ContactCard] UPDATE type result | status:', status, '| error:', JSON.stringify(error), '| data:', JSON.stringify(data));
+              if (!error) onPersonChanged?.(person.id, { type: 'friend' });
+            });
+        }
+        if (idx === 2) {
+          setEditedType('network');
+          console.log('[ContactCard] UPDATE type → network | person.id:', person.id);
+          supabase.from('people').update({ type: 'network' }).eq('id', person.id)
+            .then(({ data, error, status }) => {
+              console.log('[ContactCard] UPDATE type result | status:', status, '| error:', JSON.stringify(error), '| data:', JSON.stringify(data));
+              if (!error) onPersonChanged?.(person.id, { type: 'network' });
+            });
+        }
       }
     );
   }
@@ -218,7 +234,18 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
       : ['active', 'keep_warm', 'dont_lose_touch'];
     ActionSheetIOS.showActionSheetWithOptions(
       { options: ['Cancel', ...labels], cancelButtonIndex: 0 },
-      (idx) => { if (idx > 0) setEditedTier(values[idx - 1]); }
+      (idx) => {
+        if (idx > 0) {
+          const val = values[idx - 1];
+          setEditedTier(val);
+          console.log('[ContactCard] UPDATE cadence_tier →', val, '| person.id:', person.id);
+          supabase.from('people').update({ cadence_tier: val }).eq('id', person.id)
+            .then(({ data, error, status }) => {
+              console.log('[ContactCard] UPDATE cadence_tier result | status:', status, '| error:', JSON.stringify(error), '| data:', JSON.stringify(data));
+              if (!error) onPersonChanged?.(person.id, { cadence_tier: val });
+            });
+        }
+      }
     );
   }
 
@@ -226,7 +253,16 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
     Alert.prompt(
       'Where you know them from',
       '',
-      (text) => setEditedWhereFrom(text.trim() || undefined),
+      (text) => {
+        const val = text.trim() || undefined;
+        setEditedWhereFrom(val);
+        console.log('[ContactCard] UPDATE where_from →', val ?? null, '| person.id:', person.id);
+        supabase.from('people').update({ where_from: val ?? null }).eq('id', person.id)
+          .then(({ data, error, status }) => {
+            console.log('[ContactCard] UPDATE where_from result | status:', status, '| error:', JSON.stringify(error), '| data:', JSON.stringify(data));
+            if (!error) onPersonChanged?.(person.id, { where_from: val });
+          });
+      },
       'plain-text',
       editedWhereFrom ?? '',
     );
@@ -236,7 +272,16 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
     Alert.prompt(
       'Birthday',
       'Format: YYYY-MM-DD',
-      (text) => setEditedBirthday(text.trim() || undefined),
+      (text) => {
+        const val = text.trim() || undefined;
+        setEditedBirthday(val);
+        console.log('[ContactCard] UPDATE birthday →', val ?? null, '| person.id:', person.id);
+        supabase.from('people').update({ birthday: val ?? null }).eq('id', person.id)
+          .then(({ data, error, status }) => {
+            console.log('[ContactCard] UPDATE birthday result | status:', status, '| error:', JSON.stringify(error), '| data:', JSON.stringify(data));
+            if (!error) onPersonChanged?.(person.id, { birthday: val });
+          });
+      },
       'plain-text',
       editedBirthday ?? '',
     );
@@ -247,7 +292,18 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
     const values: InteractionType[] = ['call', 'facetime', 'text', 'email', 'in_person'];
     ActionSheetIOS.showActionSheetWithOptions(
       { options: ['Cancel', ...labels], cancelButtonIndex: 0 },
-      (idx) => { if (idx > 0) setEditedNudge(values[idx - 1]); }
+      (idx) => {
+        if (idx > 0) {
+          const val = values[idx - 1];
+          setEditedNudge(val);
+          console.log('[ContactCard] UPDATE nudge_interaction_type →', val, '| person.id:', person.id);
+          supabase.from('people').update({ nudge_interaction_type: val }).eq('id', person.id)
+            .then(({ data, error, status }) => {
+              console.log('[ContactCard] UPDATE nudge_interaction_type result | status:', status, '| error:', JSON.stringify(error), '| data:', JSON.stringify(data));
+              if (!error) onPersonChanged?.(person.id, { nudge_interaction_type: val });
+            });
+        }
+      }
     );
   }
 
@@ -388,7 +444,9 @@ function ContactCardContent({ person, onClose }: { person: Person; onClose: () =
             <Text style={styles.logPlaceholderText}>Log an interaction...</Text>
           </TouchableOpacity>
 
-          {interactions.length === 0 ? (
+          {interactionsLoading ? (
+            <ActivityIndicator size="small" color={Palette.accent} style={{ alignSelf: 'flex-start' }} />
+          ) : interactions.length === 0 ? (
             <View style={styles.emptyHistory}>
               <Text style={styles.emptyHistoryText}>No interactions logged yet.</Text>
               <Text style={styles.emptyHistorySubtext}>
@@ -419,9 +477,10 @@ interface Props {
   person: Person | null;
   visible: boolean;
   onClose: () => void;
+  onPersonChanged?: (id: string, changes: Partial<Person>) => void;
 }
 
-export function ContactCard({ person, visible, onClose }: Props) {
+export function ContactCard({ person, visible, onClose, onPersonChanged }: Props) {
   return (
     <Modal
       visible={visible}
@@ -431,7 +490,7 @@ export function ContactCard({ person, visible, onClose }: Props) {
       <View style={styles.overlay}>
         {/* Backdrop — tapping closes */}
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-        {person && <ContactCardContent person={person} onClose={onClose} />}
+        {person && <ContactCardContent person={person} onClose={onClose} onPersonChanged={onPersonChanged} />}
       </View>
     </Modal>
   );
