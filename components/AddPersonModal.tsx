@@ -216,8 +216,9 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
     if (!canSave || saving) return;
     setSaving(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) {
       Alert.alert('Error', 'Not authenticated.');
       setSaving(false);
       return;
@@ -225,7 +226,7 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
 
     const today = new Date().toISOString().split('T')[0];
     const insert = {
-      user_id: user.id,
+      user_id: userId,
       first_name: firstName.trim(),
       last_name: lastName.trim() || null,
       type,
