@@ -26,8 +26,12 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           setSigningOut(true);
-          await signOut();
-          // Root layout will redirect to sign-in once session clears
+          try {
+            await signOut();
+            router.replace('/(auth)/sign-in');
+          } finally {
+            setSigningOut(false);
+          }
         },
       },
     ]);

@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { MOCK_PEOPLE } from '@/data/mock';
 import type { Person, InteractionType } from '@/types';
 import { tierColor, tierLabel } from '@/utils/people';
 
@@ -38,6 +37,7 @@ export interface Props {
   visible: boolean;
   /** Pre-fill with a specific person (e.g. from "Mark as Complete") */
   initialPerson?: Person | null;
+  people: Person[];
   onClose: () => void;
   onSave?: (person: Person, type: InteractionType, notes: string, date: string) => void;
 }
@@ -68,7 +68,7 @@ function displayDate(dateStr: string): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function LogModal({ visible, initialPerson, onClose, onSave }: Props) {
+export function LogModal({ visible, initialPerson, people, onClose, onSave }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [selectedType, setSelectedType] = useState<InteractionType>('call');
@@ -139,7 +139,7 @@ export function LogModal({ visible, initialPerson, onClose, onSave }: Props) {
 
   const filteredPeople =
     searchQuery.length >= 1
-      ? MOCK_PEOPLE.filter((p) =>
+      ? people.filter((p) =>
           `${p.first_name} ${p.last_name}`
             .toLowerCase()
             .includes(searchQuery.toLowerCase())

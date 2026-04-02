@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { MOCK_PEOPLE, MOCK_INTERACTIONS } from '@/data/mock';
 import { ContactCard } from '@/components/ContactCard';
+import { usePeopleContext } from '@/contexts/people-context';
+import { useAllInteractions } from '@/hooks/use-all-interactions';
 import type { Person, Interaction } from '@/types';
 import { tierColor, tierLabel } from '@/utils/people';
 
@@ -32,20 +33,18 @@ interface LeaderEntry {
   rank: number;
 }
 
-// ─── Data helpers ─────────────────────────────────────────────────────────────
+// ─── Data helpers (pure functions, no module-level data) ─────────────────────
 
-const PERSON_TYPE_MAP = new Map(MOCK_PEOPLE.map((p) => [p.id, p.type]));
-
-function scopedInteractions(scope: Scope): Interaction[] {
-  if (scope === 'both') return MOCK_INTERACTIONS;
+function scopedInteractions(scope: Scope, allInteractions: Interaction[], personTypeMap: Map<string, string>): Interaction[] {
+  if (scope === 'both') return allInteractions;
   const targetType = scope === 'friends' ? 'friend' : 'network';
-  return MOCK_INTERACTIONS.filter((i) => PERSON_TYPE_MAP.get(i.person_id) === targetType);
+  return allInteractions.filter((i) => personTypeMap.get(i.person_id) === targetType);
 }
 
-function scopedPeople(scope: Scope): Person[] {
-  if (scope === 'both') return MOCK_PEOPLE;
+function scopedPeople(scope: Scope, allPeople: Person[]): Person[] {
+  if (scope === 'both') return allPeople;
   const targetType = scope === 'friends' ? 'friend' : 'network';
-  return MOCK_PEOPLE.filter((p) => p.type === targetType);
+  return allPeople.filter((p) => p.type === targetType);
 }
 
 /** Returns the ISO date string of the Monday of the week containing `date` */
@@ -62,25 +61,34 @@ function computeStreak(interactions: Interaction[]): { current: number; best: nu
     interactions.map((i) => weekMonday(new Date(i.date_of_interaction + 'T00:00:00')))
   );
 
-  // Current streak: walk back from today, week by week
+  // Current streak: walk back from today week by week (Bug 10: skip current week if empty)
   let current = 0;
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
+  if (!weeksWithData.has(weekMonday(cursor))) {
+    cursor.setDate(cursor.getDate() - 7);
+  }
   while (weeksWithData.has(weekMonday(cursor))) {
     current++;
     cursor.setDate(cursor.getDate() - 7);
   }
 
-  // Best streak: find longest run of consecutive weeks in sorted set
+  // Best streak: calendar arithmetic to avoid DST issues (Bug 15)
   const sorted = [...weeksWithData].sort();
   let best = 0;
   let run = 0;
-  let prevMs = 0;
+  let prevDate: Date | null = null;
   for (const ws of sorted) {
-    const ms = new Date(ws + 'T00:00:00').getTime();
-    run = prevMs > 0 && ms - prevMs === 7 * 86400000 ? run + 1 : 1;
+    const current2 = new Date(ws + 'T00:00:00');
+    if (prevDate) {
+      const expectedNext = new Date(prevDate);
+      expectedNext.setDate(expectedNext.getDate() + 7);
+      run = expectedNext.toDateString() === current2.toDateString() ? run + 1 : 1;
+    } else {
+      run = 1;
+    }
     best = Math.max(best, run);
-    prevMs = ms;
+    prevDate = current2;
   }
 
   return { current, best: Math.max(current, best) };
@@ -154,7 +162,7 @@ function TierBubble({ tier }: { tier: Person['cadence_tier'] }) {
 
 function InitialAvatar({ person, size = 36 }: { person: Person; size?: number }) {
   const color = tierColor(person.cadence_tier);
-  const initials = `${person.first_name[0]}${person.last_name[0]}`;
+  const initials = `${person.first_name?.[0] ?? '?'}${person.last_name?.[0] ?? ''}`.toUpperCase();
   return (
     <View
       style={[
@@ -234,8 +242,16 @@ export default function StatsScreen() {
   const [scope, setScope] = useState<Scope>('both');
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
 
-  const interactions = scopedInteractions(scope);
-  const people = scopedPeople(scope);
+  const { people: allPeople } = usePeopleContext();
+  const { interactions: allInteractions } = useAllInteractions();
+
+  const personTypeMap = useMemo(
+    () => new Map(allPeople.map((p) => [p.id, p.type])),
+    [allPeople]
+  );
+
+  const interactions = scopedInteractions(scope, allInteractions, personTypeMap);
+  const people = scopedPeople(scope, allPeople);
   const streak = computeStreak(interactions);
   const buckets = buildMonthBuckets(interactions);
   const leaderboard = buildLeaderboard(interactions, people);

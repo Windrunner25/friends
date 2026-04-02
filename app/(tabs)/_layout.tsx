@@ -5,9 +5,11 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Palette } from '@/constants/theme';
 import { LogModal } from '@/components/LogModal';
+import { PeopleProvider, usePeopleContext } from '@/contexts/people-context';
 
-export default function TabLayout() {
+function TabLayoutInner() {
   const [logVisible, setLogVisible] = useState(false);
+  const { people } = usePeopleContext();
 
   return (
     <>
@@ -65,7 +67,15 @@ export default function TabLayout() {
       </Tabs>
 
       {/* Log interaction dialogue — shown on Log tab tap, no intermediate screen */}
-      <LogModal visible={logVisible} onClose={() => setLogVisible(false)} />
+      <LogModal visible={logVisible} people={people} onClose={() => setLogVisible(false)} />
     </>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <PeopleProvider>
+      <TabLayoutInner />
+    </PeopleProvider>
   );
 }

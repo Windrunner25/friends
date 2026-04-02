@@ -38,11 +38,9 @@ export function nudgeLabel(type: InteractionType): string {
   return 'In Person';
 }
 
-const TODAY = new Date();
-
 export function relativeTime(dateStr?: string): string {
   if (!dateStr) return 'Never';
-  const diff = Math.round((TODAY.getTime() - new Date(dateStr).getTime()) / 86400000);
+  const diff = Math.round((new Date().getTime() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Yesterday';
   if (diff < 7) return `${diff} days ago`;
@@ -58,9 +56,10 @@ export function relativeTime(dateStr?: string): string {
 export function futureRelativeDate(dateStr: string): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
+  const target = new Date(dateStr + 'T00:00:00');
   target.setHours(0, 0, 0, 0);
   const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return 'Passed';
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Tomorrow';
   if (diff < 7) return `In ${diff} days`;
@@ -74,10 +73,15 @@ export function futureRelativeDate(dateStr: string): string {
 export function birthdayRelativeDate(birthdayStr: string): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const bday = new Date(birthdayStr);
-  bday.setFullYear(today.getFullYear());
+  const targetYear = today.getFullYear();
+  const bday = new Date(birthdayStr + 'T00:00:00');
+  bday.setFullYear(targetYear);
+  // Fix Feb 29 on non-leap years: if original was Feb 29 but setFullYear shifted it to Mar 1, set to Feb 28
+  if (bday.getMonth() === 2 && new Date(birthdayStr + 'T00:00:00').getMonth() === 1) {
+    bday.setDate(0); // last day of Feb
+  }
   bday.setHours(0, 0, 0, 0);
-  if (bday < today) bday.setFullYear(today.getFullYear() + 1);
+  if (bday < today) bday.setFullYear(targetYear + 1);
   return futureRelativeDate(bday.toISOString().split('T')[0]);
 }
 

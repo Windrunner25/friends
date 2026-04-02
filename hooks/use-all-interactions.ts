@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Interaction, InteractionType } from '@/types';
 
-interface UseInteractionsResult {
+interface UseAllInteractionsResult {
   interactions: Interaction[];
   loading: boolean;
   error: string | null;
   refetch: () => void;
 }
 
-export function useInteractions(personId: string): UseInteractionsResult {
+export function useAllInteractions(): UseAllInteractionsResult {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,10 +17,18 @@ export function useInteractions(personId: string): UseInteractionsResult {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setError('Not authenticated');
+      setLoading(false);
+      return;
+    }
+
     const { data, error: fetchError } = await supabase
       .from('interactions')
       .select('*')
-      .eq('person_id', personId)
+      .eq('user_id', user.id)
       .order('date_of_interaction', { ascending: false });
 
     if (fetchError) {
@@ -38,7 +46,7 @@ export function useInteractions(personId: string): UseInteractionsResult {
       );
     }
     setLoading(false);
-  }, [personId]);
+  }, []);
 
   useEffect(() => {
     load();

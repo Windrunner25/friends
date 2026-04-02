@@ -20,7 +20,8 @@ import { Palette } from '@/constants/theme';
 import { MOCK_MOMENTS, MockMoment } from '@/data/mock';
 import { ContactCard } from '@/components/ContactCard';
 import { LogModal } from '@/components/LogModal';
-import { usePeople } from '@/hooks/use-people';
+import { usePeopleContext } from '@/contexts/people-context';
+import { supabase } from '@/lib/supabase';
 import type { Person, InteractionType } from '@/types';
 import {
   tierColor,
@@ -35,12 +36,15 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const TODAY = new Date();
-
 function formatHeaderDate(): string {
-  const weekday = TODAY.toLocaleDateString('en-US', { weekday: 'long' });
-  const month = TODAY.toLocaleDateString('en-US', { month: 'long' });
-  return `${weekday}, ${month} ${TODAY.getDate()}`;
+  const today = new Date();
+  const weekday = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const month = today.toLocaleDateString('en-US', { month: 'long' });
+  const day = today.getDate();
+  const showYear = today.getMonth() === 0 && day <= 7;
+  return showYear
+    ? `${weekday}, ${month} ${day}, ${today.getFullYear()}`
+    : `${weekday}, ${month} ${day}`;
 }
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -62,7 +66,7 @@ function TierBubble({ tier }: { tier: Person['cadence_tier'] }) {
 
 function InitialAvatar({ person, size = 44 }: { person: Person; size?: number }) {
   const color = tierColor(person.cadence_tier);
-  const initials = `${person.first_name[0]}${person.last_name[0]}`;
+  const initials = `${person.first_name?.[0] ?? '?'}${person.last_name?.[0] ?? ''}`.toUpperCase();
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color + '30' }]}>
       <Text style={[styles.avatarInitials, { color }]}>{initials}</Text>
@@ -240,7 +244,7 @@ function FriendsPage({
   onPersonPress: (p: Person) => void;
   onMarkComplete: (p: Person) => void;
 }) {
-  console.log('[FriendsPage] received people prop, count:', people.length);
+  if (__DEV__) console.log('[FriendsPage] received people prop, count:', people.length);
   const sorted = [...people].sort((a, b) => (b.days_overdue ?? -999) - (a.days_overdue ?? -999));
   // Up Next: up to 4 people due (days_overdue >= 0), most overdue first
   const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 4);
@@ -326,7 +330,7 @@ function NetworkPage({
 }) {
   const [selectedMoment, setSelectedMoment] = useState<MockMoment | null>(null);
 
-  console.log('[NetworkPage] received people prop, count:', people.length);
+  if (__DEV__) console.log('[NetworkPage] received people prop, count:', people.length);
   const sorted = [...people].sort((a, b) => (b.days_overdue ?? -999) - (a.days_overdue ?? -999));
   const upNext = sorted.filter((p) => (p.days_overdue ?? -1) >= 0).slice(0, 4);
   const upNextIds = new Set(upNext.map((p) => p.id));
@@ -428,11 +432,10 @@ function NetworkPage({
 export default function HomeScreen() {
   const router = useRouter();
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
-  const { people, loading, updatePerson } = usePeople();
+  const { people, loading, updatePerson } = usePeopleContext();
   const friends = people.filter((p) => p.type === 'friend');
   const network = people.filter((p) => p.type === 'network');
-  console.log('[HomeScreen] loading:', loading, '| total people:', people.length, '| friends:', friends.length, '| network:', network.length);
-  if (people.length > 0) console.log('[HomeScreen] first person:', JSON.stringify(people[0], null, 2));
+  if (__DEV__) console.log('[HomeScreen] loading:', loading, '| total people:', people.length, '| friends:', friends.length, '| network:', network.length);
   const [activeTab, setActiveTab] = useState<'friends' | 'network'>('friends');
   const [pagerHeight, setPagerHeight] = useState(SCREEN_HEIGHT);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -456,8 +459,25 @@ export default function HomeScreen() {
     setLogModalVisible(true);
   }
 
-  function handleLogSave(person: Person, _type: InteractionType, _notes: string, _date: string) {
+  async function handleLogSave(person: Person, type: InteractionType, notes: string, date: string) {
     setCompletedIds((prev) => new Set([...prev, person.id]));
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from('interactions').insert({
+      user_id: user.id,
+      person_id: person.id,
+      date_of_interaction: date,
+      date_logged: new Date().toISOString().split('T')[0],
+      type,
+      notes: notes.trim() || null,
+    });
+    if (!error) {
+      await supabase.from('people')
+        .update({ last_interaction_date: date, last_interaction_note: notes.trim() || null })
+        .eq('id', person.id);
+      const { computeDaysOverdue } = await import('@/utils/people');
+      updatePerson(person.id, { last_interaction_date: date, days_overdue: computeDaysOverdue(date, person.cadence_tier) });
+    }
   }
 
   return (
@@ -505,6 +525,7 @@ export default function HomeScreen() {
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={handlePageChange}
+            onScrollEndDrag={handlePageChange}
             scrollEventThrottle={16}
             style={{ flex: 1 }}>
             <FriendsPage
@@ -542,6 +563,7 @@ export default function HomeScreen() {
       <LogModal
         visible={logModalVisible}
         initialPerson={logModalPerson}
+        people={people}
         onClose={() => { setLogModalVisible(false); setLogModalPerson(null); }}
         onSave={handleLogSave}
       />

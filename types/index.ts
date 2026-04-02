@@ -7,6 +7,7 @@ export interface Person {
   id: string;
   first_name: string;
   last_name: string;
+  photo?: string;
   type: PersonType;
   cadence_tier: CadenceTier | NetworkTier;
   where_from?: string;
@@ -16,6 +17,8 @@ export interface Person {
   last_interaction_date?: string; // ISO date string, derived from interactions
   last_interaction_note?: string; // snippet from most recent interaction notes
   days_overdue?: number; // positive = overdue, negative = days until due, 0 = due today
+  phone?: string;
+  email?: string;
 }
 
 export interface Interaction {
