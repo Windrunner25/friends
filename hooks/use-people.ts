@@ -9,6 +9,7 @@ interface UsePeopleResult {
   error: string | null;
   refetch: () => void;
   updatePerson: (id: string, changes: Partial<Person>) => void;
+  addPerson: (person: Person) => void;
 }
 
 export function usePeople(): UsePeopleResult {
@@ -76,9 +77,13 @@ export function usePeople(): UsePeopleResult {
     }));
   }, []);
 
+  const addPerson = useCallback((person: Person) => {
+    setPeople((prev) => [person, ...prev]);
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
 
-  return { people, loading, error, refetch: load, updatePerson };
+  return { people, loading, error, refetch: load, updatePerson, addPerson };
 }

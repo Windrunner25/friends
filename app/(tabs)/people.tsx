@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
 import { ContactCard } from '@/components/ContactCard';
+import { AddPersonModal } from '@/components/AddPersonModal';
 import { usePeopleContext } from '@/contexts/people-context';
 import type { Person } from '@/types';
 import { tierColor, tierLabel, tierIconName, relativeTime } from '@/utils/people';
@@ -187,12 +188,13 @@ function PeoplePage({
 
 export default function PeopleScreen() {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
-  const { people, loading, updatePerson } = usePeopleContext();
+  const { people, loading, updatePerson, addPerson } = usePeopleContext();
   const friends = people.filter((p) => p.type === 'friend');
   const network = people.filter((p) => p.type === 'network');
   const [activeTab, setActiveTab] = useState<'friends' | 'network'>('friends');
   const [pagerHeight, setPagerHeight] = useState(SCREEN_HEIGHT);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+  const [addModalVisible, setAddModalVisible] = useState(false);
   const pagerRef = useRef<ScrollView>(null);
 
   function handleTabPress(tab: 'friends' | 'network') {
@@ -215,7 +217,7 @@ export default function PeopleScreen() {
         if (idx === 1) {
           Alert.alert('Coming soon', 'Contact import will be available in a future update.');
         } else if (idx === 2) {
-          Alert.alert('Coming soon', 'Manual add will be available in a future update.');
+          setAddModalVisible(true);
         }
       }
     );
@@ -293,6 +295,17 @@ export default function PeopleScreen() {
         onPersonChanged={(id, changes) => {
           updatePerson(id, changes);
           setSelectedPerson((prev) => (prev?.id === id ? { ...prev, ...changes } : prev));
+        }}
+      />
+
+      {/* Add person modal */}
+      <AddPersonModal
+        visible={addModalVisible}
+        defaultType={activeTab === 'network' ? 'network' : 'friend'}
+        onClose={() => setAddModalVisible(false)}
+        onSave={(person) => {
+          addPerson(person);
+          setAddModalVisible(false);
         }}
       />
 

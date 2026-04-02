@@ -8,6 +8,7 @@ interface UsePeopleResult {
   error: string | null;
   refetch: () => void;
   updatePerson: (id: string, changes: Partial<Person>) => void;
+  addPerson: (person: Person) => void;
 }
 
 const defaultValue: UsePeopleResult = {
@@ -16,6 +17,7 @@ const defaultValue: UsePeopleResult = {
   error: null,
   refetch: () => {},
   updatePerson: () => {},
+  addPerson: () => {},
 };
 
 const PeopleContext = createContext<UsePeopleResult>(defaultValue);
