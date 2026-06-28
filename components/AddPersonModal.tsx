@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,18 @@ import {
   ScrollView,
   StyleSheet,
   Modal,
-  ActionSheetIOS,
   Alert,
   ActivityIndicator,
   Platform,
   useWindowDimensions,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
+import { supabase, DEV_USER_ID } from '@/lib/supabase';
 import { tierColor, tierLabel, tierIconName, nudgeIconName, nudgeLabel } from '@/utils/people';
+import { showActionSheet } from '@/utils/action-sheet';
 import type { Person, InteractionType } from '@/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,6 +95,28 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
   const [nudge, setNudge] = useState<InteractionType>(defaultNudgeForTier(defaultTierForType(defaultType)));
   const [saving, setSaving] = useState(false);
 
+  const dragY = useRef(new Animated.Value(0)).current;
+  const scrollYRef = useRef(0);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dy, dx }) =>
+        scrollYRef.current <= 0 && dy > 8 && Math.abs(dy) > Math.abs(dx),
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) dragY.setValue(dy);
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 90 || vy > 1.5) {
+          onCloseRef.current();
+        } else {
+          Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
   const canSave = firstName.trim().length > 0;
 
   function reset() {
@@ -114,8 +138,8 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
   }
 
   function editType() {
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Cancel', 'Friend', 'Network'], cancelButtonIndex: 0 },
+    showActionSheet(
+      ['Cancel', 'Friend', 'Network'],
       (idx) => {
         if (idx === 1) {
           const newTier = 'close_friend';
@@ -140,15 +164,15 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
     const values: Person['cadence_tier'][] = isFriend
       ? ['close_friend', 'keep_warm', 'dont_lose_touch']
       : ['active', 'keep_warm', 'dont_lose_touch'];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Cancel', ...labels], cancelButtonIndex: 0 },
+    showActionSheet(
+      ['Cancel', ...labels],
       (idx) => {
         if (idx > 0) {
           const val = values[idx - 1];
           setTier(val);
           setNudge(defaultNudgeForTier(val));
         }
-      }
+      },
     );
   }
 
@@ -204,11 +228,11 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
   function editNudge() {
     const labels = ['Call', 'FaceTime', 'Text', 'Email', 'In Person'];
     const values: InteractionType[] = ['call', 'facetime', 'text', 'email', 'in_person'];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Cancel', ...labels], cancelButtonIndex: 0 },
+    showActionSheet(
+      ['Cancel', ...labels],
       (idx) => {
         if (idx > 0) setNudge(values[idx - 1]);
-      }
+      },
     );
   }
 
@@ -216,13 +240,7 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
     if (!canSave || saving) return;
     setSaving(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    if (!userId) {
-      Alert.alert('Error', 'Not authenticated.');
-      setSaving(false);
-      return;
-    }
+    const userId = DEV_USER_ID;
 
     const today = new Date().toISOString().split('T')[0];
     const insert = {
@@ -233,8 +251,6 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
       cadence_tier: tier,
       where_from: whereFrom ?? null,
       birthday: birthday ?? null,
-      phone: phone ?? null,
-      email: email ?? null,
       nudge_interaction_type: nudge,
       date_added: today,
     };
@@ -259,8 +275,8 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
       nudge_interaction_type: data.nudge_interaction_type,
       date_added: data.date_added,
       last_interaction_date: undefined,
-      phone: data.phone ?? undefined,
-      email: data.email ?? undefined,
+      phone: phone ?? undefined,
+      email: email ?? undefined,
     };
 
     reset();
@@ -278,7 +294,9 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
 
-        <View style={[styles.sheet, { height: SHEET_HEIGHT }]}>
+        <Animated.View
+          style={[styles.sheet, { height: SHEET_HEIGHT, transform: [{ translateY: dragY }] }]}
+          {...panResponder.panHandlers}>
 
           {/* Handle bar row */}
           <View style={styles.handleRow}>
@@ -295,7 +313,10 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
+            scrollEventThrottle={16}>
 
             {/* Title */}
             <View style={styles.titleRow}>
@@ -342,7 +363,7 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
               <DetailRow label="Tier" onPress={editTier}>
                 <View style={styles.detailTierRow}>
                   <View style={[styles.tierIconBubble, { backgroundColor: tierColorVal + '28' }]}>
-                    <IconSymbol name={tierIconName(tier, type)} size={11} color={tierColorVal} />
+                    <IconSymbol name={tierIconName(tier, type) as any} size={11} color={tierColorVal} />
                   </View>
                   <TierBubble tier={tier} />
                 </View>
@@ -384,7 +405,7 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
 
               <DetailRow label="Nudge via" onPress={editNudge}>
                 <View style={styles.detailIconRow}>
-                  <IconSymbol name={nudgeIconName(nudge)} size={13} color={Palette.text} />
+                  <IconSymbol name={nudgeIconName(nudge) as any} size={13} color={Palette.text} />
                   <Text style={styles.detailValue}>{nudgeLabel(nudge)}</Text>
                 </View>
               </DetailRow>
@@ -407,7 +428,7 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
             </TouchableOpacity>
           </View>
 
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -418,7 +439,6 @@ export function AddPersonModal({ visible, defaultType = 'friend', onClose, onSav
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
   backdrop: {
@@ -426,7 +446,7 @@ const styles = StyleSheet.create({
     top: 0, left: 0, right: 0, bottom: 0,
   },
   sheet: {
-    backgroundColor: Palette.background,
+    backgroundColor: '#DDD4C5',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',

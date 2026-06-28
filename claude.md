@@ -1,453 +1,89 @@
-# Project Overview
+# Friends — Working Notes
 
-A personal, privacy-first relationship manager for staying connected with friends and professional contacts. Built for one user initially, with commercialization in mind.
+Privacy-first relationship manager (iOS-first, Expo/RN + Supabase). Solo build, commercialization in mind.
 
-**Core principle:** Create opportunities to connect, not obligations. The app should never make the user feel guilty — only gently surface moments to reach out. No overdue language, no guilt-inducing UI anywhere in the app.
-
----
-
-# Tech Stack
-
-## Core
-- **Framework:** Expo + React Native (iOS first)
-- **Language:** JavaScript / JSX
-- **Font:** Plus Jakarta Sans (Bold for headings, Regular for body, Light for labels)
-
-## Backend & Database
-- **Supabase** — PostgreSQL database, authentication, cloud sync
-- **@supabase/supabase-js** — Supabase client library
-
-## Authentication
-- **expo-auth-session** — handles Apple and Google OAuth flows
-- **expo-crypto** — required for secure auth token handling
-- Sign in with Apple + Sign in with Google (no username/password)
-
-## Navigation
-- **react-navigation** — overall app navigation and bottom tab bar
-- **@react-navigation/bottom-tabs** — bottom tab navigator (Home, People, Log, Stats)
-- **@react-navigation/native-stack** — stack navigation within tabs
-- **react-native-pager-view** — paged swipe navigation for Friends/Network tab switching throughout the app
-
-## UI Components
-- **@gorhom/bottom-sheet** — bottom sheet modal for contact cards
-- **react-native-gesture-handler** — required peer dependency for gestures and swipe interactions
-- **react-native-reanimated** — required peer dependency for animations
-- **expo-image-picker** — selecting profile photos from camera roll
-
-## Device Features
-- **expo-contacts** — reading iPhone contacts during onboarding and single contact import
-- **expo-notifications** — push notifications for reminders and digest
-- **expo-linking** — deep linking to Messages, Phone, FaceTime, Mail from contact card action buttons
-
-## AI
-- **Claude API** — conversation starters and personalized prompts (wired in after core build is complete)
-- API key lives server-side via Supabase edge functions — never exposed in the app
-
-## Utilities
-- **date-fns** — date formatting and relative time calculations (e.g. "6 weeks ago")
+**Core product rule:** create opportunities to connect, never obligations. **No "overdue" or guilt-inducing copy anywhere user-facing** — this overrides aesthetic/convenience tradeoffs because it's the product's entire reason to exist over a calendar reminder.
 
 ---
 
-# Design System
+## Quick Reference
 
-## Color Palette
-- **Background:** #E8DFD0 (warm tan)
-- **Primary Text:** #1A1410 (deep warm charcoal)
-- **Secondary Text:** #6B5F52 (secondary text / inactive icons)
-- **Accent:** #2D5F8A (deep steel blue — buttons, highlights, active states)
-- **Mid Tier:** #4A7A9B (Keep Warm tier indicator)
-- **Light Tier:** #7A9DB5 (Don't Lose Touch tier indicator)
-- **Card Surface:** #F0EAE0 (card surface)
-- **Dividers / Borders:** #C8BFB0 (subtle warm border)
-- **Completed State:** soft gray overlay with soft green circled checkmark
-
-## Tier Color System
-- Close Friend / Active → #2D5F8A (deep steel blue)
-- Keep Warm → #4A7A9B (mid blue)
-- Don't Lose Touch → #7A9DB5 (light blue)
-
-## Tier Icons
-Each tier has a dedicated icon displayed inside a colored bubble matching the tier color.
-
-**Friends**
-- Close Friend → Polaroid icon (bubble: #2D5F8A)
-- Keep Warm → Hammock icon (bubble: #4A7A9B)
-- Don't Lose Touch → Feather icon (bubble: #7A9DB5)
-
-**Network**
-- Active → Lightning bolt icon (bubble: #2D5F8A)
-- Keep Warm → Anchor icon (bubble: #4A7A9B)
-- Don't Lose Touch → Satellite icon (bubble: #7A9DB5)
-
-Tier icons appear consistently throughout the app wherever a tier is referenced — Up Next cards, birthday tiles, person detail cards, onboarding swipe screens, leaderboard rows.
-
-## Tier Bubbles (text)
-Tier name spelled out in a small rounded pill/bubble, color coded to tier:
-- "Close Friend" / "Active" → #2D5F8A bubble
-- "Keep Warm" → #4A7A9B bubble
-- "Don't Lose Touch" → #7A9DB5 bubble
-
-## Design Principles
-- Minimalistic, warm, fluid
-- Generous white space
-- No guilt-inducing language or UI anywhere
-- No "overdue" labels ever shown to user
-- Subtle animations
-- Clean row-based layouts over heavy card designs
-- Consistent tier color and icon language throughout
-- Paged swipe navigation (react-native-pager-view) for Friends/Network tab switching throughout the app
+- **Working dir & git root:** `friends/` — the parent folder is *not* a repo; run git from here.
+- **Run:** `npm start`, then `i` for iOS or scan the QR in Expo Go.
+- **Check before device:** `npm run typecheck` (clean — 0 errors) and `npm run lint` (0 errors, 2 pre-existing exhaustive-deps warnings). Any new `error TS` line is a regression to fix.
+- **Required config:** `lib/supabase.js` reads `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` from a **gitignored `.env`**. A fresh clone won't connect until that file exists.
+- **Theme:** import `Palette` from `@/constants/theme`; never hardcode hex so a palette change stays one-line.
+- **Path alias:** `@/*` → project root.
 
 ---
 
-# Data Model
+## Dev Mode — auth is bypassed (important)
 
-## User
-- id
-- first_name
-- last_name
-- email
-- date_joined
-- settings: { weekly_digest_day, weekly_digest_time, notification_preferences: { time_based, birthday, digest, holiday }, default_interaction_type }
+The app intentionally runs unauthenticated for solo dev. Non-obvious because the code "works" while being pre-launch:
 
-## Person
-- id
-- user_id (foreign key)
-- first_name
-- last_name
-- photo (optional)
-- type: 'friend' | 'network'
-- cadence_tier: 'close_friend' | 'keep_warm' | 'dont_lose_touch' (friends) OR 'active' | 'keep_warm' | 'dont_lose_touch' (network)
-- where_from (optional — e.g. "college roommate", "former job")
-- birthday (optional)
-- nudge_interaction_type: 'call' | 'facetime' | 'text' | 'email' | 'in_person'
-- date_added
-- last_interaction_date (derived from interaction log)
+- Every query filters by a hardcoded `DEV_USER_ID` (`lib/supabase.js`) instead of `auth.uid()`.
+- Sign-in (`app/(auth)/sign-in.tsx`) is email/password placeholder; **`app/_layout.tsx` does NOT gate `(tabs)` on a session** — the "routes to (tabs)" comment in sign-in is stale.
+- `AuthProvider` inserts a `users` row on first `SIGNED_IN` — relevant when wiring real auth.
 
-**Note:** nudge_interaction_type represents what kind of interaction the app nudges you toward for that person. Smart defaults are assigned automatically during onboarding based on tier (see Cadence Tiers section) but can be overridden per person at any time.
-
-## Interaction
-- id
-- person_id (foreign key)
-- date_of_interaction (manually set, defaults to today)
-- date_logged (auto-stamped at save time — never shown to user)
-- type: 'call' | 'facetime' | 'text' | 'email' | 'in_person'
-- notes (optional, short free text)
-
-## Reminder
-- id
-- person_id (optional — holiday reminders not tied to one person)
-- type: 'time_based' | 'birthday' | 'weekly_digest' | 'public_holiday'
-- scheduled_date
-- status: 'pending' | 'sent' | 'dismissed'
-- message (nudge text shown to user)
-
-## Stats
-- id
-- user_id (foreign key)
-- current_weekly_streak (number of consecutive weeks with at least one interaction logged)
-- greatest_consecutive_weeks (all-time best streak)
-- yearly_snapshots (array of { year, total_interactions, total_unique_people, best_streak })
-
-**Note:** Total interactions logged and total unique people are calculated live from Interaction records — not stored separately.
+**Before launch:** (1) wire Apple/Google via the installed `expo-auth-session`; (2) gate `(tabs)` on a session in `app/_layout.tsx`; (3) replace `DEV_USER_ID` with the live user id; (4) **confirm Supabase RLS is enabled** — client-side `user_id` filtering is not a security boundary.
 
 ---
 
-# Cadence Tiers
+## Architecture & data flow
 
-## Friends
-- **Close Friend** → reach out most frequently
-- **Keep Warm** → moderate cadence
-- **Don't Lose Touch** → occasional check-ins
-
-## Network
-- **Active** → reach out most frequently
-- **Keep Warm** → moderate cadence
-- **Don't Lose Touch** → occasional check-ins
-
-## Default Nudge Interaction Types (assigned automatically at onboarding, overridable per person)
-**Friends**
-- Close Friend → Call
-- Keep Warm → Call
-- Don't Lose Touch → Text
-
-**Network**
-- Active → Text
-- Keep Warm → Text
-- Don't Lose Touch → Email
+- **Provider scope is the main gotcha:** `AuthProvider` is at the root (`useAuth()` everywhere); `PeopleProvider` is mounted only at `app/(tabs)/_layout.tsx`. Screens outside `(tabs)` — `settings`, `(auth)`, `modal` — **cannot** call `usePeopleContext()`.
+- New screens that need the roster consume `usePeopleContext()`, not `usePeople()` directly, so the whole tree shares one fetch.
+- Domain fetches live in `hooks/`; `lib/supabase.js` is the only client.
+- **Mutations are optimistic:** local context update (`updatePerson`/`addPerson`) + Supabase write, no full refetch. Capture the returned `{ error }` on every write and roll back local state on failure — several inline-edit writes in `ContactCard.tsx` historically skipped this.
+- Gate debug logging behind `if (__DEV__)` so production stays quiet.
 
 ---
 
-# Features
+## Design system
 
-## Onboarding (one-time flow)
-1. Welcome screen
-2. Sign in with Apple or Sign in with Google
-3. Name entry (pre-filled from auth provider where possible)
-4. Contacts permission screen (plain-language explanation of why contacts are needed)
-5. Contacts checklist — scrollable, searchable list; each contact row has a "Friend" button and a "Network" button (not a toggle — two distinct buttons per row)
-6. Friend swipe screen — three-direction swipe to assign tier:
-   - Swipe right → Close Friend
-   - Swipe up → Keep Warm
-   - Swipe left → Don't Lose Touch
-   - Each tier displays its icon during the swipe for visual reinforcement
-   - Nudge interaction type is automatically assigned based on tier
-7. Network swipe screen — same mechanic (right = Active, up = Keep Warm, left = Don't Lose Touch)
-8. Summary confirmation screen — totals by type and tier, option to go back and adjust
-9. Notification permission screen
+Colors and fonts: `constants/theme.ts` (`Palette`, `Fonts`). Tier color/icon/label/nudge helpers: `utils/people.ts`. The non-obvious parts:
 
-## People Management
-- Manually add a person or import from iPhone contacts post-onboarding
-- Edit or delete any person
-- Override nudge interaction type per person
-- View full interaction history per person
-- Person detail via contact card bottom sheet
-- Inline field editing — tap any field to edit, no separate edit mode
-
-## Interaction Log
-- Triggered by tapping the Log tab from anywhere in the app
-- Immediately surfaces the log interaction dialogue — no intermediate screen
-- Search all contacts to find person → confirm interaction type (pre-filled with nudge type) → optional notes → save
-- After saving, dialogue dismisses and user returns to the screen they were on
-- Also triggered from Up Next "Mark as Complete" button with person name pre-filled
-
-## Reminders
-- Time-based nudges when someone is due based on cadence tier
-- Birthday reminders for people with birthdays added
-- Weekly digest — soft nudge surfacing who's due (configurable day/time in settings)
-- Broad public holiday reminders (Thanksgiving, New Year's, July 4th, etc.)
-
-## Conversation Starters
-- Randomly selected from a pool of 10 universal static prompts on each card open
-- Claude API will be wired in later — UI slot already present
-- Static prompt pool:
-  1. "It's been a while — would love to catch up soon."
-  2. "Been thinking about you lately, hope all is well."
-  3. "Would love to hear what you've been up to."
-  4. "Long overdue for a proper catch up."
-  5. "Hope life is treating you well — let's reconnect soon."
-  6. "Been too long, would love to find a time to chat."
-  7. "Randomly thought of you today — hope you're doing great."
-  8. "Would love to hear what's new with you."
-  9. "It's been a minute — let's catch up soon."
-  10. "Thinking of you — hope everything is going well."
-
-## Stats & Tracker
-- Current weekly streak with all-time best
-- Total interactions logged (calculated live)
-- Total unique people reached out to (calculated live)
-- Monthly bar charts (interactions and unique people)
-- Leaderboard of most-contacted people
+- Tier tint uses a hex-alpha suffix — `'30'` for tier bubbles/icon circles, `'28'` for name bubbles inside cards. Match the neighboring screen; don't introduce a third value.
+- Tier icon + color language must stay consistent everywhere a tier appears (cards, Up Next, leaderboard) — it's the app's primary visual vocabulary.
+- iOS-first, **light mode only** (`Colors.dark === Colors.light`); Plus Jakarta Sans designed-for but not loaded.
 
 ---
 
-# Screen Flow
+## Data model
 
-## Bottom Navigation (4 tabs)
-1. **Home**
-2. **People**
-3. **Log** — tapping immediately triggers log interaction dialogue, no screen
-4. **Stats**
+Types: `types/index.ts`. Facts not inferrable from the TS:
 
-Settings lives as a gear icon in the top right corner of the Home screen — not a tab.
-
----
-
-## Home Screen (fully detailed)
-
-### Top Bar
-- **Top left:** App logo (TBD — designed by Nano Banana)
-- **Top center:** Today's date in Plus Jakarta Sans Light (e.g. "Tuesday, February 27")
-- **Top right:** Gear icon → opens Settings
-
-### Friends / Network Sub-tabs
-- Sits just below the top bar
-- Two tab labels: "Friends" and "Network"
-- Active tab has a small dusty steel blue (#2D5F8A) underline indicator
-- Paged swipe navigation — swiping left/right slides the entire view as one wide canvas (react-native-pager-view)
-- All sections below respond to the active tab
-
-### Up Next Section — 2x2 Grid
-- Shows 4 people who are due for an interaction based on cadence tier
-- Displayed as a 2x2 grid of rounded rectangle cards
-- Pulled systematically from a pool of due interactions
-- Rotation logic: same person will not appear two weeks in a row unless the pool is exhausted
-- Refreshes weekly with a new set of 4
-- No overdue language anywhere — never label anything as overdue to the user
-
-**Each card contains:**
-- Name (prominent)
-- Tier bubble (colored pill with tier name spelled out)
-- Nudge type icon (phone for call, message bubble for text, envelope for email, etc.)
-- Relative time ("6 weeks ago", "3 months ago", "yesterday")
-- "Mark as Complete" button
-
-**Mark as Complete behavior:**
-- Tapping opens the log interaction dialogue with person name pre-filled
-- User confirms interaction type (pre-filled with nudge type) and adds optional notes
-- After saving, card grays out softly with a soft green circled checkmark in the center
-- Card stays in place until weekly refresh
-
-### Upcoming Section
-Section is titled "Upcoming" on both Friends and Network tabs.
-
-**Friends tab — single row:**
-- Birthday tiles only (no row label needed)
-- Horizontal scrollable
-- Each birthday tile contains:
-  - Photo or initial avatar
-  - Name
-  - Relative date ("in 3 days", "in 2 weeks", "next month")
-  - Tier icon in a colored bubble matching their tier color
-
-**Network tab — two rows:**
-
-Row 1 — labeled "Birthdays"
-- Same birthday tile design as Friends tab
-- Horizontal scrollable
-
-Row 2 — labeled "Moments"
-- Horizontal scrollable holiday/seasonal tiles
-- Each Moments tile contains:
-  - A seasonal icon (e.g. sparkle for New Year's, leaf for Thanksgiving, firework for July 4th, calendar for end of Q4)
-  - Holiday or seasonal name
-  - Relative date ("in 3 weeks")
-  - A conversation starter as preview text (e.g. "Great time to check in after the holidays")
-- Tapping a Moments tile opens a modal showing recommended network contacts who are due for a touchpoint around that time, using the same row design (name, tier bubble, nudge type icon, relative time)
-- Moments tiles are visually distinct from birthday tiles — icon-led rather than avatar-led
-
-### Bottom Roster
-- Header: "More Friends!" on Friends tab, "More Buddies!" on Network tab
-- A fuller, inviting list of additional people worth reaching out to
-- Weighted mix: people closer to their due date surface higher, with natural randomization for churn
-- Each row: name, tier bubble, nudge type icon, relative time
-- Tapping a row opens the contact card bottom sheet
+- `days_overdue` and `last_interaction_note` are **derived client-side** in `usePeople`, not columns.
+- **No `Stats` table** — streak/totals/leaderboard computed live in `stats.tsx`. **No `Reminder` table** (notifications unbuilt). A `users` table exists but isn't typed.
+- **`supabase/migrations/` has the RLS schema** — check there before altering tables. Schema was previously hosted-only; RLS policies and the migration were added in the 2026-06-27 audit.
+- **Cadence** (`utils/people.ts > CADENCE_DAYS`): drives `days_overdue` and Up Next order. Never-contacted people are treated as overdue by one full cadence period — deliberate so new contacts surface.
+- `defaultNudgeForTier` (`AddPersonModal.tsx`) takes only `tier`, not `type`, so Friend/Network share a default per tier. Change the signature if a Network-specific override is needed.
 
 ---
 
-## Contact Card (Bottom Sheet Modal)
+## Conventions & gotchas
 
-Triggered from: Up Next grid, bottom roster, Moments modal, People screen, leaderboard rows.
-
-**Behavior:** slides up from bottom to roughly one inch from top of screen. Background visible in top gap — tapping it collapses the sheet. X in top right also closes it. Swipe down to dismiss.
-
-### Header
-- Profile photo or initial avatar
-- First and last name
-- Action buttons sitting next to photo (iPhone style):
-  - Text icon → opens Messages
-  - Call icon → opens Phone
-  - FaceTime icon → opens FaceTime
-  - Mail icon → opens Mail
-
-### Contact Details (inline editable)
-All fields are tappable — tapping opens a selector or input for that value. No separate edit mode. Fields with no value display "---" which is not a selectable option, only a display state. Category labels are bold (Plus Jakarta Sans Bold).
-- Type (Friend or Network)
-- Tier (with icon and colored bubble)
-- Where you know them from
-- Birthday
-- Nudge interaction type
-- Date added
-- Last interaction date
-
-### Conversation Starter
-- Sits above the interaction history
-- Randomly selected from the pool of 10 universal static prompts on each card open
-- Claude API will be wired in here later — UI slot already present
-
-### Interaction History Timeline
-- Placeholder "Log an interaction..." box sits at the very top of the timeline — tapping triggers the log interaction dialogue with person pre-filled
-- Vertical timeline below the placeholder
-- Each entry shows:
-  - Date of interaction as the callout anchor
-  - Interaction type
-  - Notes in a box below
-  - Notes longer than 2 lines are truncated with ellipsis — tap to expand
-- Empty state: friendly placeholder if no interactions logged yet
+- **Icons:** new SF Symbol names need an entry in `components/ui/icon-symbol.tsx > MAPPING` or they silently render nothing on Android. `tierIconName`/`nudgeIconName` return `string` but `IconSymbol` expects `SFSymbols7_0` — all existing call sites cast `as any`; do the same for any new ones.
+- **Bottom sheets:** ContactCard/AddPersonModal use a custom `Modal` + `PanResponder` + inner `ScrollView bounces={false}` pattern — reuse it; `@gorhom/bottom-sheet` is not installed.
+- **Selectors:** `showActionSheet` (`utils/action-sheet.ts`); short text input via `Alert.prompt` (iOS-only).
+- **Paged tabs:** Friends/Network use `ScrollView pagingEnabled` (not pager-view); see `index.tsx`/`people.tsx`.
+- **`// Bug N` comments** mark non-obvious fixes (DST math, recompute-on-merge, stable refs). Keep them; there's no external bug list.
+- **Intentional duplication:** `TierBubble`/`InitialAvatar` are re-implemented per screen on purpose (per-screen sizing) — don't DRY until a 5th+ variant appears.
+- `data/mock.ts` is mostly dead but `MOCK_MOMENTS` is still used by `index.tsx` — don't delete the file.
 
 ---
 
-## People Screen
+## Roadmap
 
-### Layout
-- Friends / Network sub-tabs (paged swipe navigation)
-- Tier filter pills below sub-tabs — tap to toggle, filters the list. Pills: all tiers for the active tab (e.g. Close Friend, Keep Warm, Don't Lose Touch for Friends)
-- Search bar
-- Each row: name, tier bubble, tier icon, last interaction date
-- Tap row → opens contact card bottom sheet
+**Built:** Home, People, Stats, Contact card, LogModal, AddPersonModal, email/password sign-in, settings (email + sign-out).
 
-### Adding a New Person
-Floating + button, bottom right corner. Tapping surfaces two options:
-- **Import from contacts** — native iOS contact picker opens, user selects one person, name and photo pre-fill
-- **Add manually** — blank contact card opens
-
-Both paths open a contact card in new contact mode. All fields show "---" and are tappable to assign values using the same inline editing pattern as the regular contact card.
-
-**Required fields before Save is enabled:** first name, Friend/Network type, tier. All other fields optional.
+**Not started:** onboarding (9-step flow), reminders/notifications, OAuth, contacts import (`expo-contacts` not installed; FAB shows "Coming soon"), Claude-generated conversation starters, Up Next weekly-cohort rotation (today: top-4 by `days_overdue`), font loading, notification/digest settings.
 
 ---
 
-## Log Tab
+## Build approach & commercialization
 
-- Tapping the Log tab from anywhere in the app immediately triggers the log interaction dialogue — no intermediate screen
-- Flow: search all contacts → select person → confirm interaction type (pre-filled with that person's nudge interaction type) → optional notes → save
-- After saving, dialogue dismisses and user returns to the screen they were on before
-
----
-
-## Stats Screen
-
-### Pill Filter
-- Top of screen: Both / Friends / Network
-- Filters all data on the screen — tiles, charts, and leaderboard
-
-### Top Row — Two Tiles
-- **Left tile:** Current weekly streak (large bold number), flame icon, "week streak" label. Secondary line below in smaller text: "Best: X weeks"
-- **Right tile:** Total interactions (large bold number), "interactions" label
-
-### Bar Chart 1 — Interactions
-- Full width rounded rectangle tile
-- Bar chart with rolling 12 month x axis, current month on far right
-- Scrollable left and right along x axis for older months
-- Y axis: number of interactions
-- Responds to pill filter
-
-### Bar Chart 2 — Unique People
-- Same design as interactions chart, directly below it
-- Y axis: number of unique people reached out to each month
-- Responds to pill filter
-
-### Leaderboard
-- Title: "Leaderboard"
-- Scrollable list of people ranked by total interaction count
-- Scope responds to pill filter
-- Each row: rank number, profile photo or initial avatar, name, tier bubble, interaction count
-- Tapping a row opens the contact card bottom sheet
-
----
-
-## Settings (gear icon on Home)
-- Account info
-- Notification preferences (on/off per reminder type)
-- Weekly digest day and time preference
-- Sign out
-
----
-
-# Commercialization Notes
-- Data model structured for multi-user from day one
-- No hardcoded personal preferences — everything configurable per user
-- Claude API key should live server-side via Supabase edge functions — never exposed in app
-- Authentication already in place via Apple and Google sign-in
-- Cloud sync enabled from launch — no painful migration later
-- Likely model: freemium (up to 15 people free, unlimited paid) or one-time purchase
-- No ads, no data selling — privacy is a core brand value
-- Future B2B / professional networking angle possible but should be a separate product
-
----
-
-# Build Approach
-- Build one screen / feature at a time
-- Verify working on device before moving to next feature
-- iOS first via Expo Go for development
-- Keep it simple — this is a quiet personal tool, not a platform
-- Never use overdue language or guilt-inducing copy anywhere in the app
+- One screen/feature at a time; run the static gate, then verify on a real device before moving on.
+- Multi-user from day one (`user_id` on `people`/`interactions`); everything per-user configurable.
+- **Claude API key must live server-side (Supabase edge function), never bundled.**
+- Cloud sync from launch; privacy is a brand value (no ads, no data selling).

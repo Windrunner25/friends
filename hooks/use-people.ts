@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, DEV_USER_ID } from '@/lib/supabase';
 import { computeDaysOverdue } from '@/utils/people';
 import type { Person } from '@/types';
 
@@ -21,17 +21,12 @@ export function usePeople(): UsePeopleResult {
     setLoading(true);
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setError('Not authenticated');
-      setLoading(false);
-      return;
-    }
+    const userId = DEV_USER_ID;
 
     const { data, error: fetchError } = await supabase
       .from('people')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (__DEV__) {
       console.log('[usePeople] row count:', data?.length ?? 0);

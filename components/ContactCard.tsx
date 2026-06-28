@@ -10,14 +10,13 @@ import {
   Animated,
   Linking,
   Alert,
-  ActionSheetIOS,
   ActivityIndicator,
   Platform,
   useWindowDimensions,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
+import { supabase, DEV_USER_ID } from '@/lib/supabase';
 import { useInteractions } from '@/hooks/use-interactions';
 import { LogModal } from '@/components/LogModal';
 import { usePeopleContext } from '@/contexts/people-context';
@@ -31,7 +30,9 @@ import {
   relativeTime,
   formatLongDate,
   formatShortDate,
+  computeDaysOverdue,
 } from '@/utils/people';
+import { showActionSheet } from '@/utils/action-sheet';
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ function ActionButton({ icon, label, onPress, disabled }: { icon: string; label:
   return (
     <TouchableOpacity style={[styles.actionBtn, disabled && { opacity: 0.3 }]} onPress={onPress} activeOpacity={0.75} disabled={disabled}>
       <View style={styles.actionBtnCircle}>
-        <IconSymbol name={icon} size={17} color="#fff" weight="medium" />
+        <IconSymbol name={icon as any} size={17} color="#fff" weight="medium" />
       </View>
       <Text style={styles.actionBtnLabel}>{label}</Text>
     </TouchableOpacity>
@@ -124,7 +125,7 @@ function HistoryEntry({ interaction, isLast }: { interaction: Interaction; isLas
       <View style={[styles.historyContent, !isLast && styles.historyContentSpacing]}>
         <Text style={styles.historyDate}>{formatShortDate(interaction.date_of_interaction)}</Text>
         <View style={styles.historyTypeRow}>
-          <IconSymbol name={nudgeIconName(interaction.type)} size={12} color={Palette.iconInactive} />
+          <IconSymbol name={nudgeIconName(interaction.type) as any} size={12} color={Palette.iconInactive} />
           <Text style={styles.historyType}>{nudgeLabel(interaction.type)}</Text>
         </View>
         {hasNotes && (
@@ -161,8 +162,32 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
   const [editedNudge, setEditedNudge] = useState<InteractionType>(person.nudge_interaction_type);
 
   const { interactions, loading: interactionsLoading, refetch: refetchInteractions } = useInteractions(person.id);
-  const { people } = usePeopleContext();
+  const { people, updatePerson } = usePeopleContext();
   const [logVisible, setLogVisible] = useState(false);
+
+  async function handleLogSave(p: Person, type: InteractionType, notes: string, date: string) {
+    const { error } = await supabase.from('interactions').insert({
+      user_id: DEV_USER_ID,
+      person_id: p.id,
+      date_of_interaction: date,
+      date_logged: new Date().toISOString().split('T')[0],
+      type,
+      notes: notes.trim() || null,
+    });
+    if (!error) {
+      const { error: updateError } = await supabase.from('people')
+        .update({ last_interaction_date: date, last_interaction_note: notes.trim() || null })
+        .eq('id', p.id);
+      if (!updateError) {
+        updatePerson(p.id, {
+          last_interaction_date: date,
+          days_overdue: computeDaysOverdue(date, p.cadence_tier),
+        });
+        onPersonChanged?.(p.id, { last_interaction_date: date });
+      }
+      refetchInteractions();
+    }
+  }
 
   const dragY = useRef(new Animated.Value(0)).current;
   // Tracks ScrollView position so we only intercept downward drags at the top
@@ -209,25 +234,29 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
   function openMail() { if (person.email) Linking.openURL(`mailto:${person.email}`); }
 
   function editType() {
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Cancel', 'Friend', 'Network'], cancelButtonIndex: 0 },
+    showActionSheet(
+      ['Cancel', 'Friend', 'Network'],
       (idx) => {
         if (idx === 1) {
+          const prevType = editedType; const prevTier = editedTier;
           const newTier = 'close_friend';
           setEditedType('friend');
           setEditedTier(newTier);
           supabase.from('people').update({ type: 'friend', cadence_tier: newTier }).eq('id', person.id)
             .then(({ error }) => {
-              if (!error) onPersonChanged?.(person.id, { type: 'friend', cadence_tier: newTier });
+              if (error) { setEditedType(prevType); setEditedTier(prevTier); Alert.alert('Could not save', 'Check your connection and try again.'); }
+              else { onPersonChanged?.(person.id, { type: 'friend', cadence_tier: newTier }); }
             });
         }
         if (idx === 2) {
+          const prevType = editedType; const prevTier = editedTier;
           const newTier = 'active';
           setEditedType('network');
           setEditedTier(newTier);
           supabase.from('people').update({ type: 'network', cadence_tier: newTier }).eq('id', person.id)
             .then(({ error }) => {
-              if (!error) onPersonChanged?.(person.id, { type: 'network', cadence_tier: newTier });
+              if (error) { setEditedType(prevType); setEditedTier(prevTier); Alert.alert('Could not save', 'Check your connection and try again.'); }
+              else { onPersonChanged?.(person.id, { type: 'network', cadence_tier: newTier }); }
             });
         }
       }
@@ -242,15 +271,17 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
     const values: Person['cadence_tier'][] = isFriend
       ? ['close_friend', 'keep_warm', 'dont_lose_touch']
       : ['active', 'keep_warm', 'dont_lose_touch'];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Cancel', ...labels], cancelButtonIndex: 0 },
+    showActionSheet(
+      ['Cancel', ...labels],
       (idx) => {
         if (idx > 0) {
           const val = values[idx - 1];
+          const prevTier = editedTier;
           setEditedTier(val);
           supabase.from('people').update({ cadence_tier: val }).eq('id', person.id)
             .then(({ error }) => {
-              if (!error) onPersonChanged?.(person.id, { cadence_tier: val });
+              if (error) { setEditedTier(prevTier); Alert.alert('Could not save', 'Check your connection and try again.'); }
+              else { onPersonChanged?.(person.id, { cadence_tier: val }); }
             });
         }
       }
@@ -263,10 +294,12 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
       '',
       (text) => {
         const val = text.trim() || undefined;
+        const prev = editedWhereFrom;
         setEditedWhereFrom(val);
         supabase.from('people').update({ where_from: val ?? null }).eq('id', person.id)
           .then(({ error }) => {
-            if (!error) onPersonChanged?.(person.id, { where_from: val });
+            if (error) { setEditedWhereFrom(prev); Alert.alert('Could not save', 'Check your connection and try again.'); }
+            else { onPersonChanged?.(person.id, { where_from: val }); }
           });
       },
       'plain-text',
@@ -284,10 +317,12 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
           Alert.alert('Invalid date', 'Please use YYYY-MM-DD format (e.g. 1990-06-15).');
           return;
         }
+        const prev = editedBirthday;
         setEditedBirthday(trimmed);
         supabase.from('people').update({ birthday: trimmed ?? null }).eq('id', person.id)
           .then(({ error }) => {
-            if (!error) onPersonChanged?.(person.id, { birthday: trimmed });
+            if (error) { setEditedBirthday(prev); Alert.alert('Could not save', 'Check your connection and try again.'); }
+            else { onPersonChanged?.(person.id, { birthday: trimmed }); }
           });
       },
       'plain-text',
@@ -298,15 +333,17 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
   function editNudge() {
     const labels = ['Call', 'FaceTime', 'Text', 'Email', 'In Person'];
     const values: InteractionType[] = ['call', 'facetime', 'text', 'email', 'in_person'];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Cancel', ...labels], cancelButtonIndex: 0 },
+    showActionSheet(
+      ['Cancel', ...labels],
       (idx) => {
         if (idx > 0) {
           const val = values[idx - 1];
+          const prev = editedNudge;
           setEditedNudge(val);
           supabase.from('people').update({ nudge_interaction_type: val }).eq('id', person.id)
             .then(({ error }) => {
-              if (!error) onPersonChanged?.(person.id, { nudge_interaction_type: val });
+              if (error) { setEditedNudge(prev); Alert.alert('Could not save', 'Check your connection and try again.'); }
+              else { onPersonChanged?.(person.id, { nudge_interaction_type: val }); }
             });
         }
       }
@@ -370,7 +407,7 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
           <DetailRow label="Tier" onPress={editTier}>
             <View style={styles.detailTierRow}>
               <View style={[styles.tierIconBubble, { backgroundColor: tierColorVal + '28' }]}>
-                <IconSymbol name={tierIconName(editedTier, editedType)} size={11} color={tierColorVal} />
+                <IconSymbol name={tierIconName(editedTier, editedType) as any} size={11} color={tierColorVal} />
               </View>
               <TierBubble tier={editedTier} />
             </View>
@@ -396,7 +433,7 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
 
           <DetailRow label="Nudge via" onPress={editNudge}>
             <View style={styles.detailIconRow}>
-              <IconSymbol name={nudgeIconName(editedNudge)} size={13} color={Palette.text} />
+              <IconSymbol name={nudgeIconName(editedNudge) as any} size={13} color={Palette.text} />
               <Text style={styles.detailValue}>{nudgeLabel(editedNudge)}</Text>
             </View>
           </DetailRow>
@@ -424,7 +461,7 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>What to say</Text>
           <View style={styles.starterCard}>
-            <Text style={styles.starterText}>"{starter}"</Text>
+            <Text style={styles.starterText}>{`"${starter}"`}</Text>
             <TouchableOpacity
               style={styles.starterRefreshRow}
               onPress={() => setStarter(pickStarter())}
@@ -456,7 +493,7 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
             <View style={styles.emptyHistory}>
               <Text style={styles.emptyHistoryText}>No interactions logged yet.</Text>
               <Text style={styles.emptyHistorySubtext}>
-                When you log a conversation, it'll show up here.
+                When you log a conversation, it will show up here.
               </Text>
             </View>
           ) : (
@@ -479,7 +516,7 @@ function ContactCardContent({ person, onClose, onPersonChanged }: { person: Pers
         initialPerson={person}
         people={people}
         onClose={() => setLogVisible(false)}
-        onSave={() => { setLogVisible(false); refetchInteractions(); }}
+        onSave={(p, type, notes, date) => { setLogVisible(false); handleLogSave(p, type, notes, date); }}
       />
     </Animated.View>
   );
@@ -515,7 +552,6 @@ export function ContactCard({ person, visible, onClose, onPersonChanged }: Props
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
   backdrop: {

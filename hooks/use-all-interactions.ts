@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, DEV_USER_ID } from '@/lib/supabase';
 import type { Interaction, InteractionType } from '@/types';
 
 interface UseAllInteractionsResult {
@@ -18,17 +18,12 @@ export function useAllInteractions(): UseAllInteractionsResult {
     setLoading(true);
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setError('Not authenticated');
-      setLoading(false);
-      return;
-    }
+    const userId = DEV_USER_ID;
 
     const { data, error: fetchError } = await supabase
       .from('interactions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('date_of_interaction', { ascending: false });
 
     if (fetchError) {

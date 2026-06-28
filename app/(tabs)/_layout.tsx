@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -9,7 +10,17 @@ import { PeopleProvider, usePeopleContext } from '@/contexts/people-context';
 
 function TabLayoutInner() {
   const [logVisible, setLogVisible] = useState(false);
-  const { people } = usePeopleContext();
+  const { people, error } = usePeopleContext();
+  const [errorVisible, setErrorVisible] = useState(false);
+
+  // Show a brief banner when the roster fails to load, then auto-dismiss.
+  useEffect(() => {
+    if (error) {
+      setErrorVisible(true);
+      const t = setTimeout(() => setErrorVisible(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [error]);
 
   return (
     <>
@@ -68,9 +79,34 @@ function TabLayoutInner() {
 
       {/* Log interaction dialogue — shown on Log tab tap, no intermediate screen */}
       <LogModal visible={logVisible} people={people} onClose={() => setLogVisible(false)} />
+
+      {/* Error banner — shown when roster fetch fails */}
+      {errorVisible && (
+        <View style={styles.errorBanner} pointerEvents="none">
+          <Text style={styles.errorBannerText}>Could not load contacts. Check your connection.</Text>
+        </View>
+      )}
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  errorBanner: {
+    position: 'absolute',
+    bottom: 80,
+    left: 16,
+    right: 16,
+    backgroundColor: '#3A2020',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  errorBannerText: {
+    color: '#FFD0D0',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+});
 
 export default function TabLayout() {
   return (

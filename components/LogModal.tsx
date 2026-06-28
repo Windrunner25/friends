@@ -9,13 +9,13 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  ActionSheetIOS,
   Alert,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/theme';
 import type { Person, InteractionType } from '@/types';
 import { tierColor, tierLabel } from '@/utils/people';
+import { showActionSheet } from '@/utils/action-sheet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,11 +104,8 @@ export function LogModal({ visible, initialPerson, people, onClose, onSave }: Pr
   }
 
   function pickDate() {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ['Cancel', 'Today', 'Yesterday', '2 days ago', '3 days ago', 'Earlier...'],
-        cancelButtonIndex: 0,
-      },
+    showActionSheet(
+      ['Cancel', 'Today', 'Yesterday', '2 days ago', '3 days ago', 'Earlier...'],
       (idx) => {
         if (idx === 0) return;
         if (idx >= 1 && idx <= 4) {
@@ -242,7 +239,7 @@ export function LogModal({ visible, initialPerson, people, onClose, onSave }: Pr
                           onPress={() => setSelectedType(type)}
                           activeOpacity={0.75}>
                           <IconSymbol
-                            name={icon}
+                            name={icon as any}
                             size={13}
                             color={active ? '#fff' : Palette.iconInactive}
                           />
@@ -303,7 +300,7 @@ const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'transparent',
   },
   sheet: {
     backgroundColor: Palette.background,

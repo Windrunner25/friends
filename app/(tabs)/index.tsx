@@ -21,7 +21,7 @@ import { MOCK_MOMENTS, MockMoment } from '@/data/mock';
 import { ContactCard } from '@/components/ContactCard';
 import { LogModal } from '@/components/LogModal';
 import { usePeopleContext } from '@/contexts/people-context';
-import { supabase } from '@/lib/supabase';
+import { supabase, DEV_USER_ID } from '@/lib/supabase';
 import type { Person, InteractionType } from '@/types';
 import {
   tierColor,
@@ -105,7 +105,7 @@ function UpNextCard({
 
       {/* Nudge icon + relative time */}
       <View style={styles.upNextMeta}>
-        <IconSymbol name={nudgeIconName(person.nudge_interaction_type)} size={11} color={Palette.iconInactive} />
+        <IconSymbol name={nudgeIconName(person.nudge_interaction_type) as any} size={11} color={Palette.iconInactive} />
         <Text style={styles.upNextTime} numberOfLines={1}>
           {relativeTime(person.last_interaction_date)}
         </Text>
@@ -143,7 +143,7 @@ function PersonRow({ person, onPress }: { person: Person; onPress: () => void })
         <TierBubble tier={person.cadence_tier} />
       </View>
       <View style={styles.personRowRight}>
-        <IconSymbol name={nudgeIconName(person.nudge_interaction_type)} size={13} color={Palette.iconInactive} />
+        <IconSymbol name={nudgeIconName(person.nudge_interaction_type) as any} size={13} color={Palette.iconInactive} />
         <Text style={styles.personTime}>{relativeTime(person.last_interaction_date)}</Text>
       </View>
     </TouchableOpacity>
@@ -160,7 +160,7 @@ function BirthdayTile({ person, onPress }: { person: Person; onPress: () => void
       <Text style={styles.birthdayName}>{person.first_name}</Text>
       <Text style={styles.birthdayDate}>{birthdayRelativeDate(person.birthday!)}</Text>
       <View style={[styles.tierIconBubble, { backgroundColor: color + '30' }]}>
-        <IconSymbol name={tierIconName(person.cadence_tier, person.type)} size={11} color={color} />
+        <IconSymbol name={tierIconName(person.cadence_tier, person.type) as any} size={11} color={color} />
       </View>
     </TouchableOpacity>
   );
@@ -172,7 +172,7 @@ function MomentsTile({ moment, onPress }: { moment: MockMoment; onPress: () => v
   return (
     <TouchableOpacity style={styles.momentsTile} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.momentsIconContainer}>
-        <IconSymbol name={moment.icon} size={20} color={Palette.accent} />
+        <IconSymbol name={moment.icon as any} size={20} color={Palette.accent} />
       </View>
       <Text style={styles.momentsLabel}>{moment.label}</Text>
       <Text style={styles.momentsDate}>{futureRelativeDate(moment.date)}</Text>
@@ -204,7 +204,7 @@ function MomentsModal({
         <View style={styles.modalHandle} />
         <View style={styles.modalIconRow}>
           <View style={styles.modalIconBubble}>
-            <IconSymbol name={moment.icon} size={22} color={Palette.accent} />
+            <IconSymbol name={moment.icon as any} size={22} color={Palette.accent} />
           </View>
           <View>
             <Text style={styles.modalTitle}>{moment.label}</Text>
@@ -461,10 +461,9 @@ export default function HomeScreen() {
 
   async function handleLogSave(person: Person, type: InteractionType, notes: string, date: string) {
     setCompletedIds((prev) => new Set([...prev, person.id]));
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const userId = DEV_USER_ID;
     const { error } = await supabase.from('interactions').insert({
-      user_id: user.id,
+      user_id: userId,
       person_id: person.id,
       date_of_interaction: date,
       date_logged: new Date().toISOString().split('T')[0],
@@ -901,7 +900,7 @@ const styles = StyleSheet.create({
   // Moments modal
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'transparent',
   },
   modalSheet: {
     backgroundColor: Palette.background,

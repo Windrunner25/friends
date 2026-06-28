@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
-  ActionSheetIOS,
   Alert,
   ActivityIndicator,
   useWindowDimensions,
@@ -22,6 +21,7 @@ import { AddPersonModal } from '@/components/AddPersonModal';
 import { usePeopleContext } from '@/contexts/people-context';
 import type { Person } from '@/types';
 import { tierColor, tierLabel, tierIconName, relativeTime } from '@/utils/people';
+import { showActionSheet } from '@/utils/action-sheet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -208,11 +208,8 @@ export default function PeopleScreen() {
   }
 
   function handleAddPerson() {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ['Cancel', 'Import from Contacts', 'Add Manually'],
-        cancelButtonIndex: 0,
-      },
+    showActionSheet(
+      ['Cancel', 'Import from Contacts', 'Add Manually'],
       (idx) => {
         if (idx === 1) {
           Alert.alert('Coming soon', 'Contact import will be available in a future update.');
